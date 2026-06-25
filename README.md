@@ -2,6 +2,9 @@
 
 所有资料本地保存的 Wiki 式知识库,支持网页/微信公众号自动抓取、智能分类标签、GitHub Gist 跨设备同步。
 
+> GitHub 仓库: https://github.com/hiraicn/knowledge-base
+> 隐私政策: [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
+
 ## 快速开始
 
 ### 方式一:浏览器插件(推荐,零配置)
