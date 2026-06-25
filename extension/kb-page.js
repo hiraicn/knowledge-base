@@ -2,6 +2,50 @@
 var VAULT = { articles: [], categories: {}, tags: {}, stats: { total: 0, categories: 0, tags: 0 } };
 var currentArticleId = null;
 
+// ─── 搜索倒排索引 ───
+var searchIndex = { title: {}, content: {} };
+var articleMap = {};
+
+function tokenize(text) {
+  return (text || "").toLowerCase().split(/[\s,，。、；;：:!！?？()（）\[\]]+/).filter(function (w) { return w.length >= 2; });
+}
+
+function buildSearchIndex(articles) {
+  searchIndex = { title: {}, content: {} };
+  articleMap = {};
+  articles.forEach(function (a) {
+    articleMap[a.id] = a;
+    tokenize(a.title).forEach(function (w) {
+      if (!searchIndex.title[w]) searchIndex.title[w] = [];
+      if (searchIndex.title[w].indexOf(a.id) === -1) searchIndex.title[w].push(a.id);
+    });
+    tokenize(a.content).forEach(function (w) {
+      if (!searchIndex.content[w]) searchIndex.content[w] = [];
+      if (searchIndex.content[w].indexOf(a.id) === -1) searchIndex.content[w].push(a.id);
+    });
+  });
+}
+
+function searchArticles(query) {
+  var words = tokenize(query);
+  if (words.length === 0) return [];
+  var scores = {};
+  words.forEach(function (w) {
+    Object.keys(searchIndex.title).forEach(function (idx) {
+      if (idx.indexOf(w) !== -1) {
+        searchIndex.title[idx].forEach(function (id) { scores[id] = (scores[id] || 0) + 10; });
+      }
+    });
+    Object.keys(searchIndex.content).forEach(function (idx) {
+      if (idx.indexOf(w) !== -1) {
+        searchIndex.content[idx].forEach(function (id) { scores[id] = (scores[id] || 0) + 1; });
+      }
+    });
+  });
+  return Object.keys(scores).sort(function (a, b) { return scores[b] - scores[a]; })
+    .map(function (id) { return articleMap[id]; }).filter(Boolean).slice(0, 50);
+}
+
 // ─── 从 chrome.storage 加载数据 ───
 function loadFromStorage(callback) {
   chrome.storage.local.get("kb_articles", function (result) {
@@ -30,6 +74,7 @@ function loadFromStorage(callback) {
       tags: Object.keys(VAULT.tags).length,
     };
 
+    buildSearchIndex(articles);
     callback();
   });
 }
@@ -231,7 +276,8 @@ function deleteArticle(id) {
   });
 }
 
-// ─── 搜索 ───
+// ─── 搜索(倒排索引,相关性排序) ───
+var searchDebounceTimer = null;
 function handleSearch(query) {
   var resultsEl = document.getElementById("search-results");
   var treeEl = document.getElementById("category-tree");
@@ -239,21 +285,20 @@ function handleSearch(query) {
   treeEl.style.display = "none";
   resultsEl.style.display = "block";
 
-  var q = query.toLowerCase();
-  var results = VAULT.articles.filter(function (a) {
-    return a.title.toLowerCase().indexOf(q) !== -1 ||
-      (a.content || "").toLowerCase().indexOf(q) !== -1 ||
-      (a.tags || []).some(function (t) { return t.toLowerCase().indexOf(q) !== -1; }) ||
-      (a.author || "").toLowerCase().indexOf(q) !== -1;
-  });
-
-  if (results.length === 0) { resultsEl.innerHTML = '<div class="no-results">无匹配结果</div>'; return; }
-  var html = "";
-  results.slice(0, 20).forEach(function (r) {
-    html += '<div class="search-result-item" data-action="search-result" data-id="' + r.id + '">' + escapeHtml(r.title) + '<span class="sr-cat">' + escapeHtml(r.category || "") + '</span></div>';
-  });
-  if (results.length > 20) html += '<div class="no-results">还有 ' + (results.length - 20) + ' 条结果...</div>';
-  resultsEl.innerHTML = html;
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(function () {
+    var results = searchArticles(query);
+    if (results.length === 0) {
+      resultsEl.innerHTML = '<div class="no-results">无匹配结果</div>';
+      return;
+    }
+    var html = "";
+    results.slice(0, 20).forEach(function (r) {
+      html += '<div class="search-result-item" data-action="search-result" data-id="' + r.id + '">' + escapeHtml(r.title) + '<span class="sr-cat">' + escapeHtml(r.category || "") + '</span></div>';
+    });
+    if (results.length > 20) html += '<div class="no-results">还有 ' + (results.length - 20) + ' 条结果,输入更多关键词精确搜索</div>';
+    resultsEl.innerHTML = html;
+  }, 300);
 }
 
 function filterByTag(tag) {
@@ -275,7 +320,7 @@ function toggleTheme() {
   }
 }
 
-// ─── Markdown 解析(从文件内容解析为 article 对象) ───
+// ─── Markdown 解析(使用增强版 frontmatter 解析器) ───
 function parseMdContent(raw, filename) {
   var article = {
     id: KBEngine.generateId(),
@@ -291,24 +336,20 @@ function parseMdContent(raw, filename) {
     published: "",
   };
 
-  var fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (fmMatch) {
-    var fm = fmMatch[1];
-    article.content = fmMatch[2].trim();
-    fm.split("\n").forEach(function (line) {
-      var m = line.match(/^(\w+):\s*(.*)$/);
-      if (!m) return;
-      var key = m[1], val = m[2].replace(/^"(.*)"$/, "$1");
-      if (key === "tags") {
-        var tm = val.match(/\[(.*)\]/);
-        if (tm) article.tags = tm[1].split(",").map(function (t) { return t.trim().replace(/^"(.*)"$/, "$1"); }).filter(Boolean);
-      } else if (article.hasOwnProperty(key)) {
-        article[key] = val;
-      }
-    });
-  } else {
-    article.content = raw;
-  }
+  var parsed = KBEngine.parseFrontmatter(raw);
+  article.content = parsed.content;
+  var meta = parsed.meta;
+
+  if (meta.title) article.title = meta.title;
+  if (meta.url) article.url = meta.url;
+  if (meta.source) article.source = meta.source;
+  if (meta.domain) article.domain = meta.domain;
+  if (meta.author) article.author = meta.author;
+  if (meta.category) article.category = meta.category;
+  if (meta.tags && Array.isArray(meta.tags)) article.tags = meta.tags;
+  if (meta.created) article.created = meta.created;
+  if (meta.published) article.published = meta.published;
+  if (meta.id) article.id = meta.id;
 
   if (!article.category) {
     var r = KBEngine.autoTag(article.title, article.content, article.domain || "");

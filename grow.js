@@ -18,10 +18,10 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const http = require('http');
 const cheerio = require('cheerio');
 const TurndownService = require('turndown');
 const { marked } = require('marked');
+const TAXONOMY = require('./extension/lib/taxonomy.js');
 
 // ─── 配置 ────────────────────────────────────────────────
 const VAULT_DIR = path.join(__dirname, 'vault');
@@ -61,75 +61,74 @@ turndown.addRule('preserveImages', {
   },
 });
 
-// ─── 自动标签分类法 ────────────────────────────────────────
-const TAXONOMY = {
-  '人工智能': ['ai', 'artificial intelligence', 'machine learning', 'ml', 'deep learning',
-    'neural network', 'gpt', 'llm', 'transformer', 'chatgpt', 'openai', 'claude',
-    'diffusion', 'stable diffusion', 'midjourney', 'embedding', 'rag',
-    '大模型', '人工智能', '机器学习', '深度学习', '神经网络', '自然语言处理', 'nlp',
-    '计算机视觉', '大语言模型', '微调', 'fine-tune', 'prompt', 'token',
-    'hugging face', 'langchain', 'vector database', '向量数据库'],
+// TAXONOMY 从 taxonomy.js 加载(见文件顶部 require)
+// ─── 关键词计数(英文用词边界,中文用 indexOf) ───
+function countKeyword(text, kw) {
+  if (/[\u4e00-\u9fff]/.test(kw)) {
+    let count = 0, idx = 0;
+    while ((idx = text.indexOf(kw, idx)) !== -1) { count++; idx += kw.length; }
+    return count;
+  } else {
+    const re = new RegExp('\\b' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+    const m = text.match(re);
+    return m ? m.length : 0;
+  }
+}
 
-  '编程开发': ['programming', 'code', 'coding', 'software', 'developer', 'software engineer',
-    'javascript', 'python', 'rust', 'golang', 'java', 'c++', 'c#', 'typescript',
-    'react', 'vue', 'angular', 'svelte', 'node', 'node.js', 'deno', 'bun',
-    'api', 'rest', 'graphql', 'grpc', 'git', 'github', 'gitlab',
-    'docker', 'kubernetes', 'k8s', 'ci/cd', 'devops', 'linux', 'shell', 'bash',
-    '编程', '代码', '开发', '程序员', '前端', '后端', '全栈', '框架',
-    '编译', '调试', '重构', '设计模式', '开源', '敏捷开发'],
+// ─── YAML Frontmatter 解析(增强版) ───
+function parseFrontmatter(raw) {
+  const meta = {};
+  let content = raw;
+  const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (fmMatch) {
+    const fm = fmMatch[1];
+    content = fmMatch[2].trim();
+    const lines = fm.split('\n');
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim() || line.trim().startsWith('#')) { i++; continue; }
+      const colonIdx = line.indexOf(':');
+      if (colonIdx === -1) { i++; continue; }
+      const key = line.slice(0, colonIdx).trim();
+      let val = line.slice(colonIdx + 1).trim();
+      if (val === '|' || val === '>') {
+        const multiLine = [];
+        i++;
+        while (i < lines.length && (/^\s+/.test(lines[i]) || lines[i].trim() === '')) {
+          multiLine.push(lines[i]); i++;
+        }
+        meta[key] = multiLine.join('\n').trim();
+        continue;
+      }
+      if (val === '' && i + 1 < lines.length && /^\s*-\s/.test(lines[i + 1])) {
+        const arr = [];
+        i++;
+        while (i < lines.length && /^\s*-\s/.test(lines[i])) {
+          let item = lines[i].replace(/^\s*-\s*/, '').trim();
+          arr.push(stripQuotes(item)); i++;
+        }
+        meta[key] = arr;
+        continue;
+      }
+      if (val.startsWith('[') && val.endsWith(']')) {
+        meta[key] = val.slice(1, -1).split(',').map(s => stripQuotes(s.trim())).filter(Boolean);
+        i++; continue;
+      }
+      meta[key] = stripQuotes(val);
+      i++;
+    }
+  }
+  return { meta, content };
+}
 
-  '数据库': ['sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'elasticsearch',
-    'database', 'dbms', 'sqlite', 'supabase', 'prisma',
-    '数据库', '索引', '事务', '迁移'],
-
-  '云计算': ['aws', 'azure', 'gcp', 'cloud', 'serverless', 'lambda', 'edge',
-    'cdn', 'saas', 'paas', 'iaas', 'vercel', 'cloudflare', 'netlify',
-    '云', '云计算', '云服务', '容器', '微服务'],
-
-  '科学': ['science', 'physics', 'biology', 'chemistry', 'mathematics', 'math',
-    'research', 'paper', 'study', 'experiment', 'theory', 'hypothesis',
-    '科学', '物理', '生物', '化学', '数学', '研究', '论文', '实验',
-    '量子', '基因', '相对论', '神经科学'],
-
-  '商业': ['business', 'startup', 'market', 'finance', 'economic', 'investment',
-    'venture', 'capital', 'revenue', 'profit', 'b2b', 'b2c', 'saas',
-    '商业模式', '创业', '市场', '金融', '经济', '投资', '融资', '营收',
-    '商业计划', '股权', '上市', '并购'],
-
-  '产品': ['product', 'pm', 'product manager', 'product design', 'feature',
-    'roadmap', 'user story', 'prd', 'mvp', 'product-led',
-    '产品', '产品经理', '产品设计', '功能', '需求', '路线图', '用户研究'],
-
-  '设计': ['design', 'ui', 'ux', 'user experience', 'graphic', 'typography',
-    'figma', 'sketch', 'photoshop', 'illustrator', 'color', 'layout',
-    '设计', '界面设计', '用户体验', '视觉', '配色', '排版', '交互设计',
-    '设计系统', '原型'],
-
-  '科技': ['technology', 'tech', 'gadget', 'device', 'hardware', 'chip',
-    'semiconductor', 'smartphone', 'laptop', 'ar', 'vr', 'xr',
-    '科技', '技术', '设备', '硬件', '芯片', '半导体', '智能设备'],
-
-  '教育': ['education', 'learning', 'tutorial', 'course', 'teach', 'lecture',
-    'university', 'student', 'mooc', 'coursera',
-    '教育', '学习', '教程', '课程', '教学', '大学', '学生', '培训'],
-
-  '生活': ['life', 'health', 'food', 'travel', 'lifestyle', 'fitness',
-    'cooking', 'recipe', 'nutrition', 'sleep', 'exercise',
-    '生活', '健康', '美食', '旅行', '健身', '烹饪', '食谱', '营养',
-    '睡眠', '运动', '生活方式'],
-
-  '文化': ['culture', 'art', 'music', 'book', 'film', 'movie', 'literature',
-    'poetry', 'painting', 'photography', 'history', 'philosophy',
-    '文化', '艺术', '音乐', '书籍', '电影', '文学', '诗歌', '绘画',
-    '摄影', '历史', '哲学', '阅读'],
-
-  '职场': ['career', 'job', 'interview', 'resume', 'salary', 'work',
-    '职场', '工作', '面试', '简历', '薪资', '职业规划', '跳槽', '升职'],
-
-  '安全': ['security', 'cybersecurity', 'encryption', 'vulnerability',
-    'hack', 'privacy', 'malware', 'firewall',
-    '安全', '网络安全', '加密', '漏洞', '黑客', '隐私', '防火墙'],
-};
+function stripQuotes(val) {
+  if (typeof val !== 'string') return val;
+  if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+    return val.slice(1, -1);
+  }
+  return val;
+}
 
 // ─── 工具函数 ────────────────────────────────────────────
 
@@ -339,12 +338,7 @@ function autoTag(title, content, domain) {
   for (const [category, keywords] of Object.entries(TAXONOMY)) {
     let score = 0;
     for (const kw of keywords) {
-      const kwLower = kw.toLowerCase();
-      const regex = new RegExp(kwLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      const matches = text.match(regex);
-      if (matches) {
-        score += matches.length;
-      }
+      score += countKeyword(text, kw);
     }
     if (score > 0) {
       scores[category] = score;
@@ -384,7 +378,7 @@ function autoTag(title, content, domain) {
   const topCategory = sortedCategories[0];
   if (TAXONOMY[topCategory]) {
     const matchedKeywords = TAXONOMY[topCategory]
-      .filter(kw => text.toLowerCase().includes(kw.toLowerCase()))
+      .filter(kw => countKeyword(text, kw) > 0)
       .slice(0, 3);
     matchedKeywords.forEach(kw => tags.add(kw));
   }
@@ -440,47 +434,22 @@ function loadVault() {
     const filepath = path.join(VAULT_DIR, file);
     const raw = fs.readFileSync(filepath, 'utf-8');
 
-    // 解析 YAML frontmatter
-    const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-    if (!fmMatch) continue;
-
-    const frontmatterText = fmMatch[1];
-    const content = fmMatch[2].trim();
+    // 使用增强版 YAML frontmatter 解析
+    const { meta, content } = parseFrontmatter(raw);
 
     const article = {
-      id: '',
-      title: '',
-      url: '',
-      source: '',
-      domain: '',
-      author: '',
-      category: '',
-      tags: [],
-      created: '',
-      published: '',
+      id: meta.id || '',
+      title: meta.title || '',
+      url: meta.url || '',
+      source: meta.source || '',
+      domain: meta.domain || '',
+      author: meta.author || '',
+      category: meta.category || '',
+      tags: Array.isArray(meta.tags) ? meta.tags : [],
+      created: meta.created || '',
+      published: meta.published || '',
       content: content,
     };
-
-    // 简单 YAML 解析
-    const lines = frontmatterText.split('\n');
-    for (const line of lines) {
-      const match = line.match(/^(\w+):\s*(.*)$/);
-      if (!match) continue;
-      const [, key, value] = match;
-
-      if (key === 'tags') {
-        // 解析数组: ["tag1", "tag2"]
-        const tagsMatch = value.match(/\[(.*)\]/);
-        if (tagsMatch) {
-          article.tags = tagsMatch[1]
-            .split(',')
-            .map(t => t.trim().replace(/^"(.*)"$/, '$1'))
-            .filter(Boolean);
-        }
-      } else {
-        article[key] = value.replace(/^"(.*)"$/, '$1');
-      }
-    }
 
     if (article.id) {
       articles.push(article);
@@ -779,164 +748,6 @@ function listArticles() {
   }
 }
 
-// ─── 本地服务器模式(配合浏览器插件) ────────────────────────
-
-function processPageFromExtension(data) {
-  const { url, title, html } = data;
-
-  if (!url || !html) {
-    throw new Error('缺少 url 或 html 参数');
-  }
-
-  const source = detectSource(url);
-  console.log(`\n📥 收到插件请求: ${url}`);
-  console.log(`   来源: ${source === 'wechat' ? '微信公众号' : '网页'}`);
-
-  // 检查是否已存在相同 URL
-  const existing = loadVault();
-  const dup = existing.find(a => a.url === url);
-  if (dup) {
-    console.log(`   ⚠ 该 URL 已存在于知识库,跳过`);
-    return {
-      success: true,
-      duplicate: true,
-      title: dup.title,
-      category: dup.category,
-      tags: dup.tags,
-    };
-  }
-
-  // 解析内容
-  let parsed;
-  if (source === 'wechat') {
-    parsed = parseWeChat(html, url);
-  } else {
-    parsed = parseWebPage(html, url);
-  }
-
-  if (!parsed.title || parsed.title === '未知标题') {
-    parsed.title = title || '未知标题';
-  }
-
-  console.log(`   标题: ${parsed.title}`);
-
-  const markdown = htmlToMarkdown(parsed.contentHtml);
-  console.log(`   正文长度: ${markdown.length} 字符`);
-
-  let domain = '';
-  try {
-    domain = new URL(url).hostname.replace(/^www\./, '');
-  } catch (e) { /* ignore */ }
-
-  const { category, tags } = autoTag(parsed.title, markdown, domain);
-  console.log(`   分类: ${category}`);
-  console.log(`   标签: ${tags.join(', ')}`);
-
-  const article = {
-    id: generateId(),
-    title: parsed.title,
-    url: url,
-    source: source,
-    domain: domain,
-    author: parsed.author || '',
-    category: category,
-    tags: tags,
-    created: new Date(),
-    publishTime: parsed.publishTime || '',
-    content: markdown,
-  };
-
-  saveArticle(article);
-  generateHTML();
-
-  console.log(`   ✅ 添加成功!`);
-
-  return {
-    success: true,
-    duplicate: false,
-    title: article.title,
-    category: article.category,
-    tags: article.tags,
-  };
-}
-
-function startServer(port = 3456) {
-  const server = http.createServer((req, res) => {
-    // CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (req.method === 'OPTIONS') {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
-    // GET /api/status — 状态检查
-    if (req.method === 'GET' && req.url === '/api/status') {
-      const articles = loadVault();
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ status: 'ok', articles: articles.length }));
-      return;
-    }
-
-    // POST /api/add — 接收插件发来的页面
-    if (req.method === 'POST' && req.url === '/api/add') {
-      let body = '';
-      req.on('data', chunk => {
-        body += chunk;
-        if (body.length > 10 * 1024 * 1024) {
-          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify({ success: false, error: '内容过大(>10MB)' }));
-          req.destroy();
-        }
-      });
-      req.on('end', () => {
-        try {
-          const data = JSON.parse(body);
-          const result = processPageFromExtension(data);
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify(result));
-        } catch (err) {
-          console.error(`  ✗ 处理失败: ${err.message}`);
-          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify({ success: false, error: err.message }));
-        }
-      });
-      return;
-    }
-
-    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ error: 'Not found' }));
-  });
-
-  server.listen(port, () => {
-    console.log(`
-╔══════════════════════════════════════════════╗
-║  🚀 知识库服务已启动                          ║
-║  地址: http://localhost:${port}                    ║
-║                                                ║
-║  浏览器插件用法:                               ║
-║  1. 安装 knowledge-extension 插件              ║
-║  2. 在任意网页点击插件图标                      ║
-║  3. 点击"加入知识库"按钮                       ║
-║                                                ║
-║  按 Ctrl+C 停止服务                            ║
-╚══════════════════════════════════════════════╝`);
-  });
-
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`\n  ✗ 端口 ${port} 已被占用`);
-      console.error(`    换端口: node grow.js --serve --port 3457`);
-    } else {
-      console.error(`\n  ✗ 服务器错误: ${err.message}`);
-    }
-    process.exit(1);
-  });
-}
-
 // ─── CLI 入口 ────────────────────────────────────────────
 
 async function main() {
@@ -948,14 +759,12 @@ async function main() {
 
   用法:
     node grow.js <url>                    抓取网页/微信公众号文章
-    node grow.js --serve [--port 3456]    启动本地服务(配合浏览器插件)
     node grow.js --bookmarks <file.html>  导入浏览器收藏夹
     node grow.js --rebuild                重建 knowledge_base.html
     node grow.js --list                   列出所有文章
 
   示例:
     node grow.js https://mp.weixin.qq.com/s/xxxxx
-    node grow.js --serve
     node grow.js --bookmarks "C:\\Users\\me\\bookmarks.html"
     node grow.js --rebuild
     `);
@@ -963,13 +772,6 @@ async function main() {
   }
 
   ensureVaultDir();
-
-  if (args[0] === '--serve') {
-    const portIdx = args.indexOf('--port');
-    const port = portIdx >= 0 ? parseInt(args[portIdx + 1]) : 3456;
-    startServer(port);
-    return;
-  }
 
   if (args[0] === '--rebuild') {
     console.log('\n🔄 重建知识库...');

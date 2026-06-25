@@ -1,19 +1,18 @@
 {
   "name": "knowledge-base",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "2.1.0",
+  "description": "自生长个人知识库 — 浏览器插件 + CLI 抓取工具",
+  "main": "grow.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/test.js"
   },
-  "keywords": [],
+  "keywords": ["knowledge-base", "chrome-extension", "markdown", "bookmark"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "cheerio": "^1.2.0",
     "marked": "^18.0.5",
-    "sharp": "^0.35.2",
     "turndown": "^7.2.4"
   }
 }

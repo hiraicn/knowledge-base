@@ -48,7 +48,7 @@ async function loadSyncStatus() {
   }
 }
 
-// ─── 加入知识库 ───
+// ─── 加入知识库(调用共享函数) ───
 async function addToKnowledgeBase() {
   addBtn.disabled = true;
   addBtn.textContent = "⏳ 正在提取...";
@@ -60,49 +60,15 @@ async function addToKnowledgeBase() {
     var tab = tabs[0];
     if (!tab) throw new Error("无法获取当前标签页");
 
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["lib/turndown.js"],
-    });
-
-    var results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: extractPageContent,
-    });
-
-    var pageData = results[0].result;
-    if (!pageData || !pageData.markdown) throw new Error("无法提取页面内容");
-
     statusEl.textContent = "正在保存到知识库...";
 
-    var domain = KBEngine.getDomain(pageData.url);
-    var source = KBEngine.detectSource(pageData.url);
-    var tagResult = KBEngine.autoTag(pageData.title, pageData.markdown, domain);
+    var result = await extractAndCreateArticle(tab.id);
 
-    var article = {
-      id: KBEngine.generateId(),
-      title: pageData.title,
-      url: pageData.url,
-      source: source,
-      domain: domain,
-      author: pageData.author || "",
-      category: tagResult.category,
-      tags: tagResult.tags,
-      content: pageData.markdown,
-      created: new Date().toISOString(),
-      published: pageData.publishTime || "",
-    };
-
-    var storage = await chrome.storage.local.get("kb_articles");
-    var articles = storage.kb_articles || [];
-
-    var dup = articles.find(function (a) { return a.url === article.url; });
-    if (dup) {
+    if (result.duplicate) {
       statusEl.className = "status success";
-      statusEl.innerHTML = 'ℹ️ 该文章已在知识库中<div class="article-title">' + escapeHtml(dup.title) + '</div><div class="meta-line">分类: ' + escapeHtml(dup.category) + "</div>";
+      statusEl.innerHTML = 'ℹ️ 该文章已在知识库中<div class="article-title">' + escapeHtml(result.article.title) + '</div><div class="meta-line">分类: ' + escapeHtml(result.article.category) + "</div>";
     } else {
-      articles.unshift(article);
-      await chrome.storage.local.set({ kb_articles: articles });
+      var article = result.article;
       statusEl.className = "status success";
       var html = '✅ 添加成功!<div class="article-title">' + escapeHtml(article.title) + "</div>";
       html += '<div class="meta-line">分类: ' + escapeHtml(article.category) + "</div>";
