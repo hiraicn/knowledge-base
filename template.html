@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人知识库</title>
+<style>
+/* ─── CSS 变量 / 主题 ─── */
+:root {
+  --bg: #ffffff;
+  --bg-sidebar: #f8f9fa;
+  --bg-hover: #eaecf0;
+  --bg-code: #f0f0f0;
+  --bg-quote: #f7f7f7;
+  --bg-tag: #e8eef5;
+  --text: #202122;
+  --text-secondary: #54595d;
+  --text-muted: #8c8c8c;
+  --link: #3366cc;
+  --link-visited: #663366;
+  --border: #e1e3e5;
+  --border-strong: #a2a9b1;
+  --accent: #3366cc;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  --font-body: Georgia, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Consolas", "Courier New", monospace;
+  --sidebar-width: 280px;
+  --content-width: 720px;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1a2e;
+  --bg-sidebar: #161628;
+  --bg-hover: #252540;
+  --bg-code: #2a2a3e;
+  --bg-quote: #222236;
+  --bg-tag: #1e2a40;
+  --text: #e0e0e0;
+  --text-secondary: #a0a0b0;
+  --text-muted: #666680;
+  --link: #6c9eff;
+  --link-visited: #c06c9e;
+  --border: #2a2a3e;
+  --border-strong: #444460;
+  --accent: #6c9eff;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* ─── 基础重置 ─── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── 侧边栏 ─── */
+#sidebar {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 0;
+  z-index: 100;
+  transition: transform 0.3s ease;
+}
+
+#sidebar-header {
+  padding: 20px 18px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+#sidebar-header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#sidebar-header .subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+#search-box {
+  margin: 14px 18px;
+  position: relative;
+}
+
+#search-input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(51,102,204,0.15);
+}
+
+#search-box::before {
+  content: "🔍";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+#search-results {
+  margin: 0 18px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.search-result-item {
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: background 0.15s;
+}
+
+.search-result-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.search-result-item .sr-category {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+#category-tree {
+  padding: 8px 0 20px;
+}
+
+.tree-category {
+  margin-bottom: 2px;
+}
+
+.tree-category-header {
+  padding: 5px 18px 5px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+
+.tree-category-header:hover {
+  background: var(--bg-hover);
+}
+
+.tree-category-header .arrow {
+  display: inline-block;
+  width: 10px;
+  font-size: 10px;
+  transition: transform 0.2s;
+  color: var(--text-muted);
+}
+
+.tree-category.collapsed .arrow {
+  transform: rotate(-90deg);
+}
+
+.tree-category-header .count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.tree-articles {
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.tree-category.collapsed .tree-articles {
+  max-height: 0 !important;
+}
+
+.tree-article-link {
+  display: block;
+  padding: 4px 18px 4px 32px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-article-link:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.tree-article-link.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--bg-hover);
+  font-weight: 500;
+}
+
+#sidebar-footer {
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+#theme-toggle:hover {
+  background: var(--bg-hover);
+}
+
+/* ─── 主内容区 ─── */
+#main {
+  margin-left: var(--sidebar-width);
+  padding: 0;
+  min-height: 100vh;
+}
+
+#article-container {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 40px 32px 80px;
+}
+
+/* ─── 欢迎页 ─── */
+.welcome {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.welcome h2 {
+  font-family: var(--font-body);
+  font-size: 28px;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.welcome p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.8;
+  max-width: 460px;
+  margin: 0 auto 24px;
+}
+
+.welcome .stats {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-top: 28px;
+}
+
+.welcome .stat {
+  text-align: center;
+}
+
+.welcome .stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.welcome .stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.welcome .quick-start {
+  margin-top: 36px;
+  padding: 20px;
+  background: var(--bg-quote);
+  border-radius: 8px;
+  text-align: left;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.welcome .quick-start h3 {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.welcome .quick-start code {
+  display: block;
+  padding: 4px 8px;
+  margin: 4px 0;
+  background: var(--bg-code);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+/* ─── 文章元信息 ─── */
+.article-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.article-meta a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+.article-meta a:hover { text-decoration: underline; }
+
+.article-meta .meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.article-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-tag);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tag:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ─── 文章正文 ─── */
+.article-content {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+.article-content h1 {
+  font-family: var(--font-ui);
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 16px;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.article-content h2 {
+  font-family: var(--font-ui);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 32px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.article-content h3 {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 24px 0 8px;
+  color: var(--text);
+}
+
+.article-content h4 {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 20px 0 6px;
+  color: var(--text);
+}
+
+.article-content p {
+  margin: 0 0 16px;
+}
+
+.article-content a {
+  color: var(--link);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.article-content a:hover {
+  border-bottom-color: var(--link);
+}
+
+.article-content a:visited {
+  color: var(--link-visited);
+}
+
+.article-content ul,
+.article-content ol {
+  margin: 0 0 16px;
+  padding-left: 28px;
+}
+
+.article-content li {
+  margin-bottom: 4px;
+}
+
+.article-content blockquote {
+  margin: 16px 0;
+  padding: 8px 16px;
+  background: var(--bg-quote);
+  border-left: 4px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.article-content code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--bg-code);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.article-content pre {
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--bg-code);
+  border-radius: 6px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+}
+
+.article-content pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.article-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 12px 0;
+}
+
+.article-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.article-content th,
+.article-content td {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.article-content th {
+  background: var(--bg-quote);
+  font-weight: 600;
+}
+
+.article-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+/* ─── 底部导航 ─── */
+.article-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.related-articles h4 {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.related-articles ul {
+  list-style: none;
+  padding: 0;
+}
+
+.related-articles li {
+  margin-bottom: 6px;
+}
+
+.related-articles a {
+  color: var(--link);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.related-articles a:hover {
+  text-decoration: underline;
+}
+
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+  gap: 16px;
+}
+
+.nav-button {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  transition: all 0.15s;
+  cursor: pointer;
+  background: var(--bg);
+}
+
+.nav-button:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.nav-button .nav-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.nav-button .nav-title {
+  color: var(--link);
+}
+
+/* ─── 响应式 ─── */
+#sidebar-toggle {
+  display: none;
+  position: fixed;
+  top: 12px; left: 12px;
+  z-index: 200;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 36px; height: 36px;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  #sidebar-toggle { display: block; }
+  #sidebar {
+    transform: translateX(-100%);
+    box-shadow: var(--shadow);
+  }
+  #sidebar.open {
+    transform: translateX(0);
+  }
+  #main {
+    margin-left: 0;
+  }
+  #article-container {
+    padding: 20px 16px 60px;
+  }
+}
+
+/* ─── 滚动条 ─── */
+#sidebar::-webkit-scrollbar { width: 6px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+/* ─── 空搜索结果 ─── */
+.no-results {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<!-- 移动端菜单按钮 -->
+<button id="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+
+<!-- 侧边栏 -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>📚 知识库</h1>
+    <div class="subtitle">自生长个人 Wiki</div>
+  </div>
+
+  <div id="search-box">
+    <input type="text" id="search-input" placeholder="搜索文章..." oninput="handleSearch(this.value)">
+  </div>
+
+  <div id="search-results" style="display:none;"></div>
+
+  <div id="category-tree"></div>
+
+  <div id="sidebar-footer">
+    <span id="article-count">0 篇文章</span>
+    <button id="theme-toggle" onclick="toggleTheme()">🌙</button>
+  </div>
+</div>
+
+<!-- 主内容区 -->
+<div id="main">
+  <div id="article-container">
+    <div class="welcome">
+      <h2>📚 个人知识库</h2>
+      <p>所有资料本地保存,支持网页/公众号自动抓取、智能分类标签。数据完全属于你。</p>
+      <div class="stats" id="welcome-stats">
+        <div class="stat"><div class="stat-num" id="stat-articles">0</div><div class="stat-label">文章</div></div>
+        <div class="stat"><div class="stat-num" id="stat-categories">0</div><div class="stat-label">分类</div></div>
+        <div class="stat"><div class="stat-num" id="stat-tags">0</div><div class="stat-label">标签</div></div>
+      </div>
+      <div class="quick-start">
+        <h3>🚀 添加文章</h3>
+        <code>node grow.js https://example.com/article</code>
+        <code>node grow.js https://mp.weixin.qq.com/s/xxxxx</code>
+        <code>node grow.js --bookmarks bookmarks.html</code>
+        <code>node grow.js --rebuild</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 数据注入点:grow.js 会替换此处 -->
+<script id="vault-data" type="application/json">/*VAULT_DATA*/</script>
+
+<script>
+// ─── 全局状态 ───
+let VAULT = { articles: [], categories: {}, tags: {}, stats: { total: 0, categories: 0, tags: 0 } };
+let currentArticleId = null;
+
+// ─── 初始化 ───
+function init() {
+  // 加载数据
+  const dataEl = document.getElementById('vault-data');
+  if (dataEl && dataEl.textContent.trim() && dataEl.textContent.trim() !== '/*VAULT_DATA*/') {
+    try {
+      VAULT = JSON.parse(dataEl.textContent);
+    } catch (e) {
+      console.error('数据解析失败:', e);
+    }
+  }
+
+  // 恢复主题
+  const savedTheme = localStorage.getItem('kb-theme') || 'light';
+  if (savedTheme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.getElementById('theme-toggle').textContent = '☀️';
+  }
+
+  // 渲染侧边栏
+  renderSidebar();
+
+  // 路由
+  const hash = window.location.hash.slice(1);
+  if (hash) {
+    showArticle(hash);
+  } else if (VAULT.articles.length > 0) {
+    // 默认显示最新文章
+    showArticle(VAULT.articles[0].id);
+  } else {
+    showWelcome();
+  }
+
+  // 监听 hash 变化
+  window.addEventListener('hashchange', () => {
+    const id = window.location.hash.slice(1);
+    if (id) showArticle(id);
+  });
+}
+
+// ─── 渲染侧边栏 ───
+function renderSidebar() {
+  const tree = document.getElementById('category-tree');
+  const countEl = document.getElementById('article-count');
+  countEl.textContent = VAULT.stats.total + ' 篇文章';
+
+  // 更新欢迎页统计
+  document.getElementById('stat-articles').textContent = VAULT.stats.total;
+  document.getElementById('stat-categories').textContent = VAULT.stats.categories;
+  document.getElementById('stat-tags').textContent = VAULT.stats.tags;
+
+  if (VAULT.articles.length === 0) {
+    tree.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">知识库为空<br>运行 grow.js 添加文章</div>';
+    return;
+  }
+
+  let html = '';
+  const categories = Object.keys(VAULT.categories).sort();
+
+  for (const cat of categories) {
+    const articleIds = VAULT.categories[cat] || [];
+    const articles = articleIds
+      .map(id => VAULT.articles.find(a => a.id === id))
+      .filter(Boolean);
+
+    if (articles.length === 0) continue;
+
+    html += `<div class="tree-category">`;
+    html += `<div class="tree-category-header" onclick="toggleCategory(this)">`;
+    html += `<span class="arrow">▼</span> ${escapeHtml(cat)}`;
+    html += `<span class="count">${articles.length}</span>`;
+    html += `</div>`;
+    html += `<div class="tree-articles" style="max-height:${articles.length * 32}px;">`;
+
+    for (const art of articles) {
+      const title = escapeHtml(art.title);
+      html += `<a class="tree-article-link" href="#${art.id}" onclick="showArticle('${art.id}')" title="${title}">${title}</a>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  tree.innerHTML = html;
+}
+
+// ─── 折叠/展开分类 ───
+function toggleCategory(headerEl) {
+  const category = headerEl.parentElement;
+  category.classList.toggle('collapsed');
+  const articles = category.querySelector('.tree-articles');
+  if (!category.classList.contains('collapsed')) {
+    const links = articles.querySelectorAll('.tree-article-link');
+    articles.style.maxHeight = links.length * 32 + 'px';
+  } else {
+    articles.style.maxHeight = '0';
+  }
+}
+
+// ─── 显示文章 ───
+function showArticle(articleId) {
+  const article = VAULT.articles.find(a => a.id === articleId);
+  if (!article) {
+    showWelcome();
+    return;
+  }
+
+  currentArticleId = articleId;
+
+  // 更新 URL hash
+  if (window.location.hash !== '#' + articleId) {
+    history.pushState(null, null, '#' + articleId);
+  }
+
+  // 更新侧边栏高亮
+  document.querySelectorAll('.tree-article-link').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('href') === '#' + articleId);
+  });
+
+  // 构建文章 HTML
+  let html = '';
+
+  // 元信息
+  html += '<div class="article-meta">';
+  if (article.url) {
+    html += `<span class="meta-item">🔗 <a href="${escapeHtml(article.url)}" target="_blank">${escapeHtml(article.domain || '来源')}</a></span>`;
+  }
+  if (article.author) {
+    html += `<span class="meta-item">✍️ ${escapeHtml(article.author)}</span>`;
+  }
+  if (article.published) {
+    html += `<span class="meta-item">📅 ${escapeHtml(article.published)}</span>`;
+  }
+  html += `<span class="meta-item">📂 ${escapeHtml(article.category)}</span>`;
+  html += `<span class="meta-item">📥 ${escapeHtml(article.source === 'wechat' ? '微信公众号' : article.source === 'bookmark' ? '收藏夹' : '网页')}</span>`;
+  html += '</div>';
+
+  // 标签
+  if (article.tags && article.tags.length > 0) {
+    html += '<div class="article-tags">';
+    for (const tag of article.tags) {
+      html += `<span class="tag" onclick="filterByTag('${escapeHtml(tag)}')">${escapeHtml(tag)}</span>`;
+    }
+    html += '</div>';
+  }
+
+  // 正文
+  html += `<div class="article-content">`;
+  html += `<h1>${escapeHtml(article.title)}</h1>`;
+  html += article.contentHtml || '<p>(无内容)</p>';
+  html += `</div>`;
+
+  // 底部导航
+  const idx = VAULT.articles.findIndex(a => a.id === articleId);
+  const prev = idx > 0 ? VAULT.articles[idx - 1] : null;
+  const next = idx < VAULT.articles.length - 1 ? VAULT.articles[idx + 1] : null;
+
+  // 相关文章(同分类)
+  const related = (VAULT.categories[article.category] || [])
+    .filter(id => id !== articleId)
+    .slice(0, 5)
+    .map(id => VAULT.articles.find(a => a.id === id))
+    .filter(Boolean);
+
+  html += '<div class="article-footer">';
+
+  if (related.length > 0) {
+    html += '<div class="related-articles">';
+    html += '<h4>同分类文章</h4><ul>';
+    for (const r of related) {
+      html += `<li><a href="#${r.id}" onclick="showArticle('${r.id}');return false;">${escapeHtml(r.title)}</a></li>`;
+    }
+    html += '</ul></div>';
+  }
+
+  // 上一篇/下一篇
+  html += '<div class="nav-buttons">';
+  html += prev
+    ? `<div class="nav-button" onclick="showArticle('${prev.id}')"><span class="nav-label">← 上一篇</span><span class="nav-title">${escapeHtml(prev.title)}</span></div>`
+    : '<div></div>';
+  html += next
+    ? `<div class="nav-button" style="text-align:right;" onclick="showArticle('${next.id}')"><span class="nav-label">下一篇 →</span><span class="nav-title">${escapeHtml(next.title)}</span></div>`
+    : '<div></div>';
+  html += '</div>';
+
+  html += '</div>';
+
+  // 渲染
+  const container = document.getElementById('article-container');
+  container.innerHTML = html;
+
+  // 滚动到顶部
+  window.scrollTo(0, 0);
+
+  // 关闭移动端侧边栏
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+// ─── 欢迎页 ───
+function showWelcome() {
+  const container = document.getElementById('article-container');
+  container.innerHTML = `
+    <div class="welcome">
+      <h2>📚 个人知识库</h2>
+      <p>所有资料本地保存,支持网页/公众号自动抓取、智能分类标签。数据完全属于你。</p>
+      <div class="stats">
+        <div class="stat"><div class="stat-num">${VAULT.stats.total}</div><div class="stat-label">文章</div></div>
+        <div class="stat"><div class="stat-num">${VAULT.stats.categories}</div><div class="stat-label">分类</div></div>
+        <div class="stat"><div class="stat-num">${VAULT.stats.tags}</div><div class="stat-label">标签</div></div>
+      </div>
+      <div class="quick-start">
+        <h3>🚀 添加文章</h3>
+        <code>node grow.js https://example.com/article</code>
+        <code>node grow.js https://mp.weixin.qq.com/s/xxxxx</code>
+        <code>node grow.js --bookmarks bookmarks.html</code>
+        <code>node grow.js --rebuild</code>
+      </div>
+    </div>
+  `;
+}
+
+// ─── 搜索 ───
+function handleSearch(query) {
+  const resultsEl = document.getElementById('search-results');
+  const treeEl = document.getElementById('category-tree');
+
+  if (!query.trim()) {
+    resultsEl.style.display = 'none';
+    resultsEl.innerHTML = '';
+    treeEl.style.display = 'block';
+    return;
+  }
+
+  treeEl.style.display = 'none';
+  resultsEl.style.display = 'block';
+
+  const q = query.toLowerCase();
+  const results = VAULT.articles.filter(a =>
+    a.title.toLowerCase().includes(q) ||
+    a.contentHtml.toLowerCase().includes(q) ||
+    (a.tags || []).some(t => t.toLowerCase().includes(q)) ||
+    (a.author || '').toLowerCase().includes(q)
+  );
+
+  if (results.length === 0) {
+    resultsEl.innerHTML = '<div class="no-results">无匹配结果</div>';
+    return;
+  }
+
+  let html = '';
+  for (const r of results.slice(0, 20)) {
+    const title = escapeHtml(r.title);
+    const cat = escapeHtml(r.category || '');
+    html += `<div class="search-result-item" onclick="showArticle('${r.id}');document.getElementById('search-input').value='';handleSearch('')">${title}<span class="sr-category">${cat}</span></div>`;
+  }
+  if (results.length > 20) {
+    html += `<div class="no-results">还有 ${results.length - 20} 条结果...</div>`;
+  }
+  resultsEl.innerHTML = html;
+}
+
+// ─── 按标签筛选 ───
+function filterByTag(tag) {
+  document.getElementById('search-input').value = tag;
+  handleSearch(tag);
+}
+
+// ─── 主题切换 ───
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  if (current === 'dark') {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('kb-theme', 'light');
+    document.getElementById('theme-toggle').textContent = '🌙';
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('kb-theme', 'dark');
+    document.getElementById('theme-toggle').textContent = '☀️';
+  }
+}
+
+// ─── 移动端侧边栏 ───
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ─── 工具:HTML 转义 ───
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ─── 键盘快捷键 ───
+document.addEventListener('keydown', (e) => {
+  // / 聚焦搜索
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    document.getElementById('search-input').focus();
+  }
+  // ESC 清除搜索
+  if (e.key === 'Escape') {
+    const input = document.getElementById('search-input');
+    if (document.activeElement === input) {
+      input.value = '';
+      handleSearch('');
+      input.blur();
+    }
+  }
+  // 左右箭头导航文章
+  if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+    if (e.key === 'ArrowLeft' || e.key === 'j') {
+      const idx = VAULT.articles.findIndex(a => a.id === currentArticleId);
+      if (idx > 0) showArticle(VAULT.articles[idx - 1].id);
+    }
+    if (e.key === 'ArrowRight' || e.key === 'k') {
+      const idx = VAULT.articles.findIndex(a => a.id === currentArticleId);
+      if (idx >= 0 && idx < VAULT.articles.length - 1) showArticle(VAULT.articles[idx + 1].id);
+    }
+  }
+});
+
+// ─── 启动 ───
+init();
+</script>
+
+</body>
+</html>
