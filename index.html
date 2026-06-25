@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识库助手 — 把互联网变成你的个人 Wiki</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --card: #1c2330;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #7ee787;
+  --accent3: #d2a8ff;
+  --accent4: #ffa657;
+  --radius: 12px;
+  --shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+[data-theme="light"] {
+  --bg: #f6f8fa;
+  --bg2: #ffffff;
+  --card: #ffffff;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --muted: #656d76;
+  --accent: #0969da;
+  --accent2: #1a7f37;
+  --accent3: #8250df;
+  --accent4: #bc4c00;
+  --shadow: 0 8px 32px rgba(0,0,0,.12);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;transition:background .4s,color .4s}
+a{color:inherit;text-decoration:none}
+
+/* ===== Nav ===== */
+nav{position:fixed;top:0;width:100%;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:14px 5%;backdrop-filter:blur(12px);background:rgba(13,17,23,.7);border-bottom:1px solid var(--border);transition:background .4s}
+[data-theme="light"] nav{background:rgba(255,255,255,.8)}
+nav .logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
+nav .logo-icon{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent3));display:flex;align-items:center;justify-content:center;font-size:18px}
+nav ul{display:flex;gap:28px;list-style:none}
+nav ul a{color:var(--muted);font-size:15px;transition:color .2s;position:relative}
+nav ul a:hover{color:var(--text)}
+nav ul a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--accent);transition:width .3s}
+nav ul a:hover::after{width:100%}
+.nav-actions{display:flex;gap:12px;align-items:center}
+.theme-toggle{width:40px;height:40px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:.3s}
+.theme-toggle:hover{border-color:var(--accent);transform:scale(1.05)}
+.btn-github{padding:8px 20px;border-radius:10px;background:var(--card);border:1px solid var(--border);font-size:14px;font-weight:600;transition:.3s;display:flex;align-items:center;gap:8px}
+.btn-github:hover{border-color:var(--accent);box-shadow:0 0 20px rgba(88,166,255,.2)}
+
+/* ===== Hero ===== */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 5% 60px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;z-index:0}
+.hero-bg canvas{width:100%;height:100%}
+.hero-content{position:relative;z-index:1;max-width:800px}
+.badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.3);font-size:14px;color:var(--accent);margin-bottom:24px;animation:fadeInUp .8s}
+.badge .dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);animation:pulse 2s infinite}
+.hero h1{font-size:clamp(36px,6vw,64px);font-weight:800;line-height:1.15;margin-bottom:20px;animation:fadeInUp .8s .1s both}
+.hero h1 .gradient{background:linear-gradient(135deg,var(--accent),var(--accent3),var(--accent4));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:clamp(16px,2.5vw,20px);color:var(--muted);line-height:1.7;margin-bottom:36px;animation:fadeInUp .8s .2s both}
+.hero-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;animation:fadeInUp .8s .3s both}
+.btn-primary{padding:14px 32px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent3));color:#fff;font-size:16px;font-weight:700;transition:.3s;box-shadow:0 4px 20px rgba(88,166,255,.4)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(88,166,255,.5)}
+.btn-secondary{padding:14px 32px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:16px;font-weight:600;transition:.3s}
+.btn-secondary:hover{border-color:var(--accent);transform:translateY(-2px)}
+
+/* ===== Stats bar ===== */
+.stats-bar{display:flex;justify-content:center;gap:60px;padding:40px 5%;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap}
+.stat{text-align:center}
+.stat .num{font-size:36px;font-weight:800;color:var(--accent)}
+.stat .label{font-size:14px;color:var(--muted);margin-top:4px}
+
+/* ===== Section ===== */
+.section{padding:100px 5%;max-width:1200px;margin:0 auto}
+.section-tag{text-align:center;color:var(--accent);font-size:14px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}
+.section-title{text-align:center;font-size:clamp(28px,4vw,40px);font-weight:800;margin-bottom:16px}
+.section-sub{text-align:center;color:var(--muted);font-size:17px;max-width:600px;margin:0 auto 60px}
+
+/* ===== Features ===== */
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
+.feature-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;transition:.4s;position:relative;overflow:hidden}
+.feature-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent3));transform:scaleX(0);transform-origin:left;transition:transform .4s}
+.feature-card:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:var(--shadow)}
+.feature-card:hover::before{transform:scaleX(1)}
+.feature-icon{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:20px;transition:.4s}
+.feature-card:hover .feature-icon{transform:scale(1.1) rotate(-5deg)}
+.fi-1{background:rgba(88,166,255,.12)}
+.fi-2{background:rgba(126,231,135,.12)}
+.fi-3{background:rgba(210,168,255,.12)}
+.fi-4{background:rgba(255,166,87,.12)}
+.fi-5{background:rgba(88,166,255,.12)}
+.fi-6{background:rgba(126,231,135,.12)}
+.feature-card h3{font-size:20px;font-weight:700;margin-bottom:10px}
+.feature-card p{color:var(--muted);font-size:15px;line-height:1.7}
+
+/* ===== Demo ===== */
+.demo-section{background:var(--bg2);padding:100px 5%;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.demo-container{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.demo-mockup{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);position:relative}
+.demo-titlebar{background:var(--bg2);padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.demo-dot{width:12px;height:12px;border-radius:50%}
+.demo-dot.r{background:#ff5f56}.demo-dot.y{background:#ffbd2e}.demo-dot.g{background:#27c93f}
+.demo-url{margin-left:12px;padding:4px 12px;background:var(--bg);border-radius:6px;font-size:12px;color:var(--muted);flex:1}
+.demo-body{display:flex;height:360px}
+.demo-sidebar{width:200px;background:var(--bg2);border-right:1px solid var(--border);padding:16px 12px;overflow-y:auto}
+.demo-sidebar .cat{font-size:13px;color:var(--muted);margin-bottom:8px;font-weight:600}
+.demo-sidebar .cat-items a{display:block;padding:6px 10px;border-radius:6px;font-size:13px;color:var(--text);margin-bottom:2px;transition:.2s}
+.demo-sidebar .cat-items a:hover,.demo-sidebar .cat-items a.active{background:rgba(88,166,255,.1);color:var(--accent)}
+.demo-content{flex:1;padding:20px;overflow-y:auto}
+.demo-content h2{font-size:18px;margin-bottom:12px}
+.demo-content .meta{font-size:12px;color:var(--muted);margin-bottom:16px}
+.demo-content p{font-size:14px;line-height:1.7;margin-bottom:10px}
+.demo-content .tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;margin:2px}
+.tag-1{background:rgba(88,166,255,.12);color:var(--accent)}
+.tag-2{background:rgba(126,231,135,.12);color:var(--accent2)}
+.tag-3{background:rgba(210,168,255,.12);color:var(--accent3)}
+.demo-text{flex:1}
+.demo-text h2{font-size:28px;font-weight:800;margin-bottom:16px}
+.demo-text p{color:var(--muted);font-size:16px;line-height:1.8;margin-bottom:24px}
+.demo-checklist{list-style:none}
+.demo-checklist li{display:flex;align-items:center;gap:12px;padding:10px 0;font-size:15px}
+.demo-checklist .check{width:24px;height:24px;border-radius:50%;background:rgba(126,231,135,.15);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--accent2);flex-shrink:0}
+
+/* ===== How it works ===== */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:40px;max-width:1000px;margin:0 auto}
+.step{text-align:center;position:relative}
+.step-num{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent3));color:#fff;font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;transition:.4s}
+.step:hover .step-num{transform:scale(1.1);box-shadow:0 0 30px rgba(88,166,255,.4)}
+.step h3{font-size:18px;font-weight:700;margin-bottom:8px}
+.step p{color:var(--muted);font-size:14px;line-height:1.6}
+.step-arrow{font-size:24px;color:var(--border);position:absolute;top:30px;right:-20px}
+.step:last-child .step-arrow{display:none}
+
+/* ===== Privacy ===== */
+.privacy-section{background:linear-gradient(135deg,rgba(88,166,255,.05),rgba(210,168,255,.05));padding:100px 5%;text-align:center;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.privacy-section h2{font-size:clamp(28px,4vw,40px);font-weight:800;margin-bottom:20px}
+.privacy-section p{color:var(--muted);font-size:17px;max-width:600px;margin:0 auto 40px;line-height:1.7}
+.privacy-badges{display:flex;justify-content:center;gap:24px;flex-wrap:wrap}
+.privacy-badge{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 28px;display:flex;align-items:center;gap:12px;transition:.3s}
+.privacy-badge:hover{transform:translateY(-2px);border-color:var(--accent2)}
+.privacy-badge .icon{font-size:28px}
+.privacy-badge .text{text-align:left}
+.privacy-badge .text strong{display:block;font-size:15px}
+.privacy-badge .text span{font-size:13px;color:var(--muted)}
+
+/* ===== Install ===== */
+.install-section{padding:100px 5%;max-width:900px;margin:0 auto;text-align:center}
+.install-cards{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:40px}
+.install-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px 40px;transition:.4s;cursor:pointer;min-width:260px}
+.install-card:hover{transform:translateY(-6px);border-color:var(--accent);box-shadow:var(--shadow)}
+.install-card .browser-icon{font-size:48px;margin-bottom:16px}
+.install-card h3{font-size:18px;font-weight:700;margin-bottom:8px}
+.install-card p{color:var(--muted);font-size:14px;margin-bottom:20px}
+.install-card .btn{display:inline-block;padding:10px 24px;border-radius:8px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;transition:.3s}
+.install-card:hover .btn{background:var(--accent3)}
+.install-card .soon{display:inline-block;padding:10px 24px;border-radius:8px;background:var(--border);color:var(--muted);font-size:14px;font-weight:600}
+
+/* ===== Footer ===== */
+footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 5% 30px;text-align:center}
+footer .logo{display:flex;align-items:center;justify-content:center;gap:10px;font-size:20px;font-weight:700;margin-bottom:16px}
+footer p{color:var(--muted);font-size:14px;margin-bottom:24px}
+footer .links{display:flex;justify-content:center;gap:24px;margin-bottom:24px}
+footer .links a{color:var(--muted);font-size:14px;transition:color .2s}
+footer .links a:hover{color:var(--accent)}
+footer .copyright{color:var(--muted);font-size:13px;padding-top:20px;border-top:1px solid var(--border)}
+
+/* ===== Animations ===== */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.reveal{opacity:0;transform:translateY(40px);transition:opacity .6s,transform .6s}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+/* ===== Responsive ===== */
+@media(max-width:768px){
+  nav ul{display:none}
+  .demo-container{grid-template-columns:1fr}
+  .demo-sidebar{width:140px}
+  .step-arrow{display:none}
+  .stats-bar{gap:30px}
+  .stat .num{font-size:28px}
+}
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- ===== Nav ===== -->
+<nav>
+  <div class="logo">
+    <div class="logo-icon">📚</div>
+    <span>知识库助手</span>
+  </div>
+  <ul>
+    <li><a href="#features">功能</a></li>
+    <li><a href="#demo">预览</a></li>
+    <li><a href="#how">使用</a></li>
+    <li><a href="#privacy">隐私</a></li>
+    <li><a href="#install">安装</a></li>
+  </ul>
+  <div class="nav-actions">
+    <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+    <a href="https://github.com/hiraicn/knowledge-base" target="_blank" class="btn-github">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.18.47-2.64-.54-2.64-.54-.36-.92-.88-1.17-.88-1.17-.72-.49.05-.48.05-.48.8.01 1.22.82 1.22.82.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- ===== Hero ===== -->
+<section class="hero">
+  <div class="hero-bg"><canvas id="heroCanvas"></canvas></div>
+  <div class="hero-content">
+    <div class="badge"><span class="dot"></span> v2.0 已发布 · Manifest V3</div>
+    <h1>把互联网<span class="gradient">变成你的</span><br>个人知识库</h1>
+    <p>一键收藏网页，自动提取正文、智能分类打标签。<br>无需服务器，数据完全本地存储，支持 GitHub Gist 跨设备同步。</p>
+    <div class="hero-actions">
+      <a href="https://github.com/hiraicn/knowledge-base/releases" target="_blank" class="btn-primary">⬇ 立即下载</a>
+      <a href="#demo" class="btn-secondary">👀 查看预览</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Stats ===== -->
+<div class="stats-bar">
+  <div class="stat"><div class="num" data-count="14">14</div><div class="label">智能分类领域</div></div>
+  <div class="stat"><div class="num" data-count="0">0</div><div class="label">第三方服务器</div></div>
+  <div class="stat"><div class="num" data-count="100">100</div><div class="label">% 本地存储</div></div>
+  <div class="stat"><div class="num" data-count="64">64</div><div class="label">KB 轻量体积</div></div>
+</div>
+
+<!-- ===== Features ===== -->
+<section class="section" id="features">
+  <div class="section-tag reveal">核心功能</div>
+  <h2 class="section-title reveal">为知识管理而生</h2>
+  <p class="section-sub reveal">从收藏到整理，从浏览到同步，一切都在浏览器中完成</p>
+  <div class="features-grid">
+    <div class="feature-card reveal">
+      <div class="feature-icon fi-1">⚡</div>
+      <h3>一键收藏</h3>
+      <p>在任意网页按 Ctrl+Shift+K 或点击插件图标，自动提取正文内容并转换为 Markdown 格式，也支持右键菜单操作。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon fi-2">🏷️</div>
+      <h3>智能分类</h3>
+      <p>基于关键词频率分析，自动将文章归入 14 个分类领域，并生成内容标签，无需手动整理，收藏即分类。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon fi-3">📖</div>
+      <h3>Wiki 浏览器</h3>
+      <p>Wikipedia 风格的浏览界面，左侧分类目录树 + 右侧正文展示，支持全文搜索、暗黑模式、标签筛选、相关推荐。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon fi-4">☁️</div>
+      <h3>云端同步</h3>
+      <p>通过 GitHub Gist 实现跨浏览器/设备同步，数据以私有 Gist 存储，仅你自己可见，不经过任何第三方服务器。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon fi-5">📂</div>
+      <h3>批量导入</h3>
+      <p>支持从文件夹批量导入 Markdown 文件，重装插件后可快速恢复知识库，也支持单文件导入和全量导出。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon fi-6">🔒</div>
+      <h3>隐私优先</h3>
+      <p>所有数据存储在浏览器本地，不采集用户数据，不包含追踪代码。云端同步是可选功能，完全由你掌控。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Demo ===== -->
+<section class="demo-section" id="demo">
+  <div class="section-tag reveal">界面预览</div>
+  <h2 class="section-title reveal">Wikipedia 风格的浏览体验</h2>
+  <div class="demo-container">
+    <div class="demo-mockup reveal">
+      <div class="demo-titlebar">
+        <div class="demo-dot r"></div><div class="demo-dot y"></div><div class="demo-dot g"></div>
+        <div class="demo-url">chrome-extension://kb/page.html</div>
+      </div>
+      <div class="demo-body">
+        <div class="demo-sidebar">
+          <div class="cat">📂 科技</div>
+          <div class="cat-items">
+            <a class="active">Transformer 架构详解</a>
+            <a>WebAssembly 入门指南</a>
+            <a>Rust 的所有权模型</a>
+          </div>
+          <div class="cat">📂 商业</div>
+          <div class="cat-items">
+            <a>SaaS 定价策略分析</a>
+            <a>增长黑客方法论</a>
+          </div>
+          <div class="cat">📂 设计</div>
+          <div class="cat-items">
+            <a>设计系统构建指南</a>
+          </div>
+          <div class="cat">📂 人文</div>
+          <div class="cat-items">
+            <a>认知偏差与决策</a>
+          </div>
+        </div>
+        <div class="demo-content">
+          <h2>Transformer 架构详解</h2>
+          <div class="meta">来源: example.com · 2026-06-20</div>
+          <p>Transformer 是一种基于自注意力机制的神经网络架构，由 Google 在 2017 年提出。它摒弃了传统的循环神经网络结构...</p>
+          <p>核心创新在于 Self-Attention 机制，允许模型在处理每个位置时同时关注序列中的所有其他位置...</p>
+          <div style="margin-top:12px">
+            <span class="tag tag-1">AI</span>
+            <span class="tag tag-2">深度学习</span>
+            <span class="tag tag-3">NLP</span>
+            <span class="tag tag-1">Transformer</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-text reveal">
+      <h2>不止是收藏夹，更是知识管理工具</h2>
+      <p>每篇收藏的文章都会自动提取正文、智能分类、生成标签。打开知识库页面，左侧目录树按分类组织，右侧展示完整内容，就像浏览 Wikipedia 一样。</p>
+      <ul class="demo-checklist">
+        <li><div class="check">✓</div> 自动提取网页正文，过滤广告和导航</li>
+        <li><div class="check">✓</div> 14 个分类领域智能匹配</li>
+        <li><div class="check">✓</div> 全文搜索秒级定位</li>
+        <li><div class="check">✓</div> 暗黑模式护眼阅读</li>
+        <li><div class="check">✓</div> 标签筛选 + 相关文章推荐</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===== How it works ===== -->
+<section class="section" id="how">
+  <div class="section-tag reveal">使用方式</div>
+  <h2 class="section-title reveal">三步开始你的知识库</h2>
+  <p class="section-sub reveal">零配置，安装即用</p>
+  <div class="steps">
+    <div class="step reveal">
+      <div class="step-num">1</div>
+      <h3>安装插件</h3>
+      <p>从 Chrome/Edge 商店安装，或下载 ZIP 包手动加载。无需注册，无需配置。</p>
+      <div class="step-arrow">→</div>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">2</div>
+      <h3>一键收藏</h3>
+      <p>在任意网页按 Ctrl+Shift+K，或右键选择「加入知识库」，自动提取并保存。</p>
+      <div class="step-arrow">→</div>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">3</div>
+      <h3>浏览知识库</h3>
+      <p>点击「查看知识库」打开 Wiki 界面，搜索、分类浏览、标签筛选，随时查阅。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Privacy ===== -->
+<section class="privacy-section" id="privacy">
+  <div class="section-tag reveal">隐私优先</div>
+  <h2 class="reveal">你的数据，只属于你</h2>
+  <p class="reveal">知识库助手不依赖任何服务器。所有文章存储在浏览器本地，不采集用户数据，不包含追踪代码。云端同步是可选功能，数据只在你自己的 GitHub 账号中流转。</p>
+  <div class="privacy-badges">
+    <div class="privacy-badge reveal">
+      <div class="icon">🚫</div>
+      <div class="text"><strong>无服务器</strong><span>数据不离开你的设备</span></div>
+    </div>
+    <div class="privacy-badge reveal">
+      <div class="icon">🔍</div>
+      <div class="text"><strong>无追踪</strong><span>不含分析/埋点代码</span></div>
+    </div>
+    <div class="privacy-badge reveal">
+      <div class="icon">🔑</div>
+      <div class="text"><strong>你自己掌控</strong><span>Gist 同步仅你可见</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Install ===== -->
+<section class="install-section" id="install">
+  <div class="section-tag reveal">立即安装</div>
+  <h2 class="section-title reveal">开始构建你的知识库</h2>
+  <p class="section-sub reveal">选择你的浏览器，或从 GitHub 下载</p>
+  <div class="install-cards">
+    <div class="install-card reveal" onclick="window.open('https://chrome.google.com/webstore','_blank')">
+      <div class="browser-icon">🌐</div>
+      <h3>Chrome Web Store</h3>
+      <p>上架审核中，即将可用</p>
+      <span class="soon">即将上架</span>
+    </div>
+    <div class="install-card reveal" onclick="window.open('https://partner.microsoft.com/dashboard/microsoftedge','_blank')">
+      <div class="browser-icon">🧩</div>
+      <h3>Edge Add-ons</h3>
+      <p>上架审核中，即将可用</p>
+      <span class="soon">即将上架</span>
+    </div>
+    <div class="install-card reveal" onclick="window.open('https://github.com/hiraicn/knowledge-base/releases','_blank')">
+      <div class="browser-icon">⬇</div>
+      <h3>GitHub 下载</h3>
+      <p>下载 ZIP 包，手动加载到浏览器</p>
+      <span class="btn">立即下载</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer>
+  <div class="logo">
+    <div class="logo-icon">📚</div>
+    <span>知识库助手</span>
+  </div>
+  <p>把互联网变成你的个人知识库</p>
+  <div class="links">
+    <a href="https://github.com/hiraicn/knowledge-base" target="_blank">GitHub</a>
+    <a href="https://github.com/hiraicn/knowledge-base/blob/master/PRIVACY_POLICY.md" target="_blank">隐私政策</a>
+    <a href="https://github.com/hiraicn/knowledge-base/blob/master/README.md" target="_blank">文档</a>
+    <a href="https://github.com/hiraicn/knowledge-base/issues" target="_blank">反馈</a>
+  </div>
+  <div class="copyright">
+    MIT License © 2026 知识库助手 · Made with ❤
+  </div>
+</footer>
+
+<script>
+/* ===== Theme Toggle ===== */
+var themeToggle = document.getElementById('themeToggle');
+var body = document.body;
+themeToggle.addEventListener('click', function(){
+  var cur = body.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : 'dark';
+  body.setAttribute('data-theme', next);
+  themeToggle.textContent = next === 'dark' ? '🌙' : '☀';
+});
+
+/* ===== Scroll Reveal ===== */
+var observer = new IntersectionObserver(function(entries){
+  entries.forEach(function(e){
+    if(e.isIntersecting){ e.target.classList.add('visible'); }
+  });
+}, {threshold: 0.1});
+document.querySelectorAll('.reveal').forEach(function(el){ observer.observe(el); });
+
+/* ===== Count-up animation ===== */
+var countObserver = new IntersectionObserver(function(entries){
+  entries.forEach(function(e){
+    if(e.isIntersecting){
+      var el = e.target;
+      var target = parseInt(el.getAttribute('data-count'));
+      var start = 0;
+      var dur = 1200;
+      var t0 = performance.now();
+      function tick(now){
+        var p = Math.min((now - t0) / dur, 1);
+        var val = Math.floor(start + (target - start) * (1 - Math.pow(1 - p, 3)));
+        el.textContent = val;
+        if(p < 1) requestAnimationFrame(tick);
+        else el.textContent = target;
+      }
+      requestAnimationFrame(tick);
+      countObserver.unobserve(el);
+    }
+  });
+}, {threshold: 0.5});
+document.querySelectorAll('[data-count]').forEach(function(el){ countObserver.observe(el); });
+
+/* ===== Hero Canvas — animated network graph ===== */
+var canvas = document.getElementById('heroCanvas');
+var ctx = canvas.getContext('2d');
+var nodes = [];
+var edges = [];
+var W, H;
+
+function resize(){
+  W = canvas.width = canvas.offsetWidth * devicePixelRatio;
+  H = canvas.height = canvas.offsetHeight * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+}
+resize();
+window.addEventListener('resize', function(){ resize(); initNodes(); });
+
+function initNodes(){
+  nodes = [];
+  edges = [];
+  var count = 40;
+  for(var i = 0; i < count; i++){
+    nodes.push({
+      x: Math.random() * canvas.offsetWidth,
+      y: Math.random() * canvas.offsetHeight,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 2 + 1
+    });
+  }
+  for(var i = 0; i < count; i++){
+    for(var j = i + 1; j < count; j++){
+      var dx = nodes[i].x - nodes[j].x;
+      var dy = nodes[i].y - nodes[j].y;
+      var d = Math.sqrt(dx*dx + dy*dy);
+      if(d < 120) edges.push({a: i, b: j, d: d});
+    }
+  }
+}
+initNodes();
+
+var mouseX = -1000, mouseY = -1000;
+canvas.addEventListener('mousemove', function(e){
+  var rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+});
+canvas.addEventListener('mouseleave', function(){ mouseX = -1000; mouseY = -1000; });
+
+function animate(){
+  ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+  var theme = body.getAttribute('data-theme');
+  var nodeColor = theme === 'dark' ? 'rgba(88,166,255,' : 'rgba(9,105,202,';
+  var edgeColor = theme === 'dark' ? 'rgba(88,166,255,' : 'rgba(9,105,202,';
+
+  for(var i = 0; i < nodes.length; i++){
+    var n = nodes[i];
+    n.x += n.vx;
+    n.y += n.vy;
+    if(n.x < 0 || n.x > canvas.offsetWidth) n.vx *= -1;
+    if(n.y < 0 || n.y > canvas.offsetHeight) n.vy *= -1;
+
+    var dxm = n.x - mouseX;
+    var dym = n.y - mouseY;
+    var dm = Math.sqrt(dxm*dxm + dym*dym);
+    if(dm < 100){
+      n.vx += dxm / dm * 0.02;
+      n.vy += dym / dm * 0.02;
+    }
+    var sp = Math.sqrt(n.vx*n.vx + n.vy*n.vy);
+    if(sp > 1.5){ n.vx = n.vx / sp * 1.5; n.vy = n.vy / sp * 1.5; }
+
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+    ctx.fillStyle = nodeColor + '0.6)';
+    ctx.fill();
+  }
+
+  for(var i = 0; i < edges.length; i++){
+    var e = edges[i];
+    var na = nodes[e.a], nb = nodes[e.b];
+    var dx = na.x - nb.x;
+    var dy = na.y - nb.y;
+    var d = Math.sqrt(dx*dx + dy*dy);
+    if(d < 150){
+      ctx.beginPath();
+      ctx.moveTo(na.x, na.y);
+      ctx.lineTo(nb.x, nb.y);
+      ctx.strokeStyle = edgeColor + (0.15 * (1 - d/150)) + ')';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+  requestAnimationFrame(animate);
+}
+animate();
+
+/* ===== Demo sidebar interaction ===== */
+var demoLinks = document.querySelectorAll('.demo-sidebar .cat-items a');
+demoLinks.forEach(function(link){
+  link.addEventListener('click', function(e){
+    e.preventDefault();
+    demoLinks.forEach(function(l){ l.classList.remove('active'); });
+    this.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
