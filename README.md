@@ -2,7 +2,7 @@
 
 ![自生长个人知识库](hero-cover.png)
 
-所有资料本地保存的 Wiki 式知识库,支持网页/微信公众号自动抓取、智能分类标签、GitHub Gist 跨设备同步。
+所有资料本地保存的 Wiki 式知识库,支持网页/微信公众号自动抓取、TF-IDF 智能分类标签、自动摘要、双向引用、知识图谱可视化、GitHub Gist 跨设备同步。
 
 > GitHub 仓库: https://github.com/hiraicn/knowledge-base
 > 隐私政策: [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
@@ -15,7 +15,7 @@
 
 **安装步骤:**
 
-1. 解压 `knowledge-extension-v2.zip` 到任意目录
+1. 解压 `knowledge-extension-v3.zip` 到任意目录
 2. 打开 Chrome/Edge,地址栏输入 `chrome://extensions`(Edge: `edge://extensions`)
 3. 开启右上角「开发者模式」
 4. 点击「加载已解压的扩展程序」,选择解压后的 `extension` 文件夹
@@ -28,7 +28,7 @@
 3. 点击「🔄 重建知识库」重新对所有文章进行智能分类和标签
 4. 也可以右键页面 → 「📚 加入知识库」,或使用快捷键 `Ctrl+Shift+K`
 
-Wiki 界面支持:分类目录树、全文搜索、暗黑模式、导入/导出 .md 文件、从文件夹批量导入、拖拽导入、键盘快捷键(`/` 搜索,`←→` 切换文章,`ESC` 退出搜索)。
+Wiki 界面支持:分类目录树、全文搜索、暗黑模式、导入/导出 .md 文件、从文件夹批量导入、拖拽导入、键盘快捷键(`/` 搜索,`←→` 切换文章,`ESC` 退出搜索)。v3 新增:知识图谱可视化(🕸️ 按钮)、自定义分类设置(⚙️ 按钮)、文章自动摘要、双向引用关系展示。
 
 ### 导入已有 vault 文章
 
@@ -63,7 +63,7 @@ Wiki 界面支持:分类目录树、全文搜索、暗黑模式、导入/导出 
 2. 在设置面板中输入相同的 GitHub Token
 3. 点击「☁️ 从云端恢复」,所有文章自动合并到本地
 
-数据以 JSON 格式存储在私有 Gist 中(仅自己可见),同步内容包含文章正文、标签、分类、来源等全部元数据。
+数据以 JSON 格式存储在私有 Gist 中(仅自己可见),同步内容包含文章正文、标签、分类、来源等全部元数据,以及自定义分类设置(`kb-settings.json`)。
 
 ### 方式二:命令行抓取(批量导入)
 
@@ -95,14 +95,18 @@ knowledge-base/
 ├── grow.js                        # 命令行自生长引擎(抓取、标签、归档、生成)
 ├── template.html                  # Wiki 界面模板(命令行版)
 ├── knowledge_base.html            # 生成的知识库(双击打开)
-├── knowledge-extension-v2.zip     # 浏览器插件 v2 打包(无服务架构 + Gist 同步)
+├── knowledge-extension-v3.zip     # 浏览器插件 v3 打包
+├── CHANGELOG.md                   # 版本更新日志
 ├── extension/                     # 浏览器插件源码
-│   ├── manifest.json              # 插件配置(v2.0 无服务 + GitHub API 权限)
+│   ├── manifest.json              # 插件配置(v3.0 智能化)
 │   ├── popup.html / popup.js      # 弹窗界面(加入/查看/重建/同步/恢复)
 │   ├── background.js              # 右键菜单 + 快捷键
-│   ├── kb-page.html / kb-page.js  # Wiki 查看器 + 同步设置面板 + 批量导入
+│   ├── kb-page.html / kb-page.js  # Wiki 查看器 + 同步设置面板 + 自定义分类 + 批量导入
+│   ├── graph.html / graph.js      # 知识图谱可视化(D3.js 力导向图)
 │   ├── lib/
-│   │   ├── kb-engine.js           # 共享引擎(标签、分类、解析、Gist 同步)
+│   │   ├── kb-engine.js           # 共享引擎(TF-IDF、分类、摘要、引用、Gist 同步)
+│   │   ├── taxonomy.js            # 分类词库(DEFAULT_TAXONOMY)
+│   │   ├── d3.min.js              # D3.js v7.9.0(本地加载)
 │   │   ├── turndown.js            # HTML → Markdown 转换库
 │   │   └── marked.js              # Markdown → HTML 渲染库
 │   └── icons/                     # 插件图标
@@ -116,13 +120,17 @@ knowledge-base/
 ## 功能特性
 
 - **零配置插件**:无需启动服务,装好插件直接用,数据存浏览器本地存储
-- **GitHub Gist 同步**:跨浏览器/设备同步,私有 Gist 加密存储,按 URL 智能合并去重
+- **TF-IDF 智能评分**:基于 TF-IDF 算法自动分类和打标签,标题关键词 3 倍权重,分类更精准
+- **自定义分类体系**:在设置页面(⚙️)自由增删改分类和关键词,不再硬编码,支持恢复默认
+- **知识图谱可视化**:D3.js 力导向图展示文章关联(共同标签、相同域名、引用链接),支持拖拽/缩放/过滤
+- **自动摘要**:收藏时自动生成提取式摘要,在文章列表和搜索结果中预览
+- **双向引用**:自动提取文章中的链接,与知识库中已有文章建立双向引用关系
+- **GitHub Gist 同步**:跨浏览器/设备同步,私有 Gist 加密存储,按 URL 智能合并去重,自定义分类同步
 - **一键收藏**:任意网页点击即存,支持右键菜单和快捷键 `Ctrl+Shift+K`
 - **批量导入**:从文件夹选择多个 .md 文件一次性导入,自动解析 YAML frontmatter
 - **自动抓取**:命令行粘贴 URL 批量抓取网页或微信公众号文章
-- **智能标签**:基于关键词频率自动分类和打标签(14个分类领域)
 - **Markdown 归档**:每篇文章保存为带 YAML frontmatter 的 Markdown 文件
-- **Wiki 界面**:Wikipedia 风格,左侧分类目录树 + 右侧正文
+- **Wiki 界面**:Wikipedia 风格,左侧分类目录树 + 右侧正文渲染
 - **全文搜索**:输入关键词即时搜索标题和正文
 - **暗黑模式**:点击侧边栏底部按钮切换
 - **导入/导出**:Wiki 界面支持导入 .md 文件、导出全部文章、拖拽导入
@@ -131,13 +139,10 @@ knowledge-base/
 
 ## 自定义标签分类
 
-编辑 `extension/lib/kb-engine.js` 中的 `TAXONOMY` 对象(插件版),或 `grow.js` 中的 `TAXONOMY`(命令行版):
+v3 起,分类体系不再需要手动编辑代码。在知识库页面点击侧边栏底部的 ⚙️ 按钮打开设置面板,即可可视化地增删改分类和关键词。修改后点击「重建知识库」即可重新分类。自定义分类设置会随 Gist 同步到其他设备。
 
-```javascript
-const TAXONOMY = {
-  '你的分类': ['keyword1', 'keyword2', '关键词'],
-  // ...
-};
-```
+如需恢复默认分类,在设置面板中点击「恢复默认」即可。
 
-插件版修改后重新加载扩展,然后点击「🔄 重建知识库」即可重新分类。命令行版修改后运行 `node grow.js --rebuild`。
+## 版本历史
+
+详见 [CHANGELOG.md](CHANGELOG.md)。

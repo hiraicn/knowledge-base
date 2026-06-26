@@ -1,6 +1,6 @@
 {
   "name": "knowledge-base",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "自生长个人知识库 — 浏览器插件 + CLI 抓取工具",
   "main": "grow.js",
   "scripts": {
