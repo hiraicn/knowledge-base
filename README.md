@@ -1,5 +1,7 @@
 # 自生长个人知识库
 
+![自生长个人知识库](hero-cover.png)
+
 所有资料本地保存的 Wiki 式知识库,支持网页/微信公众号自动抓取、智能分类标签、GitHub Gist 跨设备同步。
 
 > GitHub 仓库: https://github.com/hiraicn/knowledge-base

@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920">
+<title>Knowledge Base - GitHub Cover</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @font-face {
+    font-family: 'SystemUI';
+    src: local('PingFang SC'), local('Microsoft YaHei'), local('Segoe UI'), local('sans-serif');
+  }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'SystemUI', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0e1a;
+    position: relative;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    background: url('hero-bg.png') center/cover no-repeat;
+    opacity: 0.85;
+  }
+
+  .bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(10,14,26,0.7) 0%, rgba(10,14,26,0.3) 40%, rgba(10,14,26,0.5) 100%);
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    padding: 80px 120px;
+    gap: 60px;
+  }
+
+  /* ─── 左侧：品牌区 ─── */
+  .left {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 36px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(99, 132, 255, 0.15);
+    border: 1px solid rgba(99, 132, 255, 0.3);
+    border-radius: 24px;
+    padding: 8px 20px;
+    width: fit-content;
+    color: #8da4ff;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 1px;
+  }
+
+  .badge svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .title {
+    font-size: 72px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.15;
+    letter-spacing: -1px;
+  }
+
+  .title .highlight {
+    background: linear-gradient(135deg, #6384ff 0%, #a78bfa 50%, #60d5f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    font-size: 26px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.6;
+    max-width: 640px;
+    font-weight: 400;
+  }
+
+  .features {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .feature-tag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 12px 20px;
+    color: rgba(255,255,255,0.85);
+    font-size: 16px;
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+  }
+
+  .feature-tag .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .icon-blue { background: rgba(99,132,255,0.2); color: #8da4ff; }
+  .icon-purple { background: rgba(167,139,250,0.2); color: #c4b5fd; }
+  .icon-cyan { background: rgba(96,213,247,0.2); color: #60d5f7; }
+  .icon-green { background: rgba(52,211,153,0.2); color: #34d399; }
+
+  /* ─── 右侧：产品预览 ─── */
+  .right {
+    flex: 0.8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .mockup {
+    width: 520px;
+    height: 620px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 60px rgba(99,132,255,0.1);
+    position: relative;
+  }
+
+  .mockup-header {
+    padding: 24px 28px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .mockup-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .mockup-dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .mockup-dots span:nth-child(1) { background: #ff5f57; }
+  .mockup-dots span:nth-child(2) { background: #febc2e; }
+  .mockup-dots span:nth-child(3) { background: #28c840; }
+
+  .mockup-title {
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    margin-left: 8px;
+  }
+
+  .mockup-body {
+    padding: 20px 28px;
+  }
+
+  .mockup-search {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px 16px;
+    color: rgba(255,255,255,0.3);
+    font-size: 14px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mockup-search svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.4;
+  }
+
+  .mockup-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6384ff, #60d5f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .mockup-articles {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .article-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .article-title {
+    color: rgba(255,255,255,0.85);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .article-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .article-tag {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .tag-ai { background: rgba(167,139,250,0.15); color: #c4b5fd; }
+  .tag-dev { background: rgba(99,132,255,0.15); color: #8da4ff; }
+  .tag-design { background: rgba(251,146,60,0.15); color: #fb923c; }
+  .tag-product { background: rgba(52,211,153,0.15); color: #34d399; }
+  .tag-science { background: rgba(96,213,247,0.15); color: #60d5f7; }
+
+  .article-date {
+    font-size: 11px;
+    color: rgba(255,255,255,0.25);
+    margin-left: auto;
+  }
+
+  /* ─── 装饰光效 ─── */
+  .glow-1 {
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(99,132,255,0.15) 0%, transparent 70%);
+    top: -100px;
+    right: 200px;
+    pointer-events: none;
+  }
+
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 70%);
+    bottom: 50px;
+    left: 100px;
+    pointer-events: none;
+  }
+
+  /* ─── 底部信息 ─── */
+  .footer {
+    position: absolute;
+    bottom: 40px;
+    left: 120px;
+    right: 120px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 3;
+  }
+
+  .footer-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: rgba(255,255,255,0.35);
+    font-size: 14px;
+  }
+
+  .footer-logo {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #6384ff, #a78bfa);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .footer-logo svg {
+    width: 16px;
+    height: 16px;
+    fill: white;
+  }
+
+  .footer-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .footer-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 6px 14px;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+  }
+
+  .footer-badge svg {
+    width: 14px;
+    height: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+<div class="glow-1"></div>
+<div class="glow-2"></div>
+
+<div class="content">
+  <!-- 左侧 -->
+  <div class="left">
+    <div class="badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      Chrome Extension · Manifest V3
+    </div>
+
+    <h1 class="title">
+      自生长<br>
+      <span class="highlight">个人知识库</span>
+    </h1>
+
+    <p class="subtitle">
+      一键收藏网页内容，AI 智能分类打标签。<br>
+      数据完全本地存储，离线可用，隐私无忧。
+    </p>
+
+    <div class="features">
+      <div class="feature-tag">
+        <div class="icon icon-blue">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </div>
+        一键收藏
+      </div>
+      <div class="feature-tag">
+        <div class="icon icon-purple">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        </div>
+        智能标签
+      </div>
+      <div class="feature-tag">
+        <div class="icon icon-cyan">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        </div>
+        全文搜索
+      </div>
+      <div class="feature-tag">
+        <div class="icon icon-green">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        本地存储
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧：产品预览 -->
+  <div class="right">
+    <div class="mockup">
+      <div class="mockup-header">
+        <div class="mockup-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <span class="mockup-title">Knowledge Base</span>
+      </div>
+      <div class="mockup-body">
+        <div class="mockup-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          搜索知识库...
+        </div>
+
+        <div class="mockup-stats">
+          <div class="stat-card">
+            <div class="stat-num">128</div>
+            <div class="stat-label">Articles</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num">14</div>
+            <div class="stat-label">Categories</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num">86</div>
+            <div class="stat-label">Tags</div>
+          </div>
+        </div>
+
+        <div class="mockup-articles">
+          <div class="article-item">
+            <div class="article-title">深度学习在自然语言处理中的最新进展</div>
+            <div class="article-meta">
+              <span class="article-tag tag-ai">人工智能</span>
+              <span class="article-tag tag-science">深度学习</span>
+              <span class="article-date">2024-06-15</span>
+            </div>
+          </div>
+          <div class="article-item">
+            <div class="article-title">Building Scalable APIs with Node.js</div>
+            <div class="article-meta">
+              <span class="article-tag tag-dev">编程开发</span>
+              <span class="article-date">2024-06-12</span>
+            </div>
+          </div>
+          <div class="article-item">
+            <div class="article-title">产品设计中的信息架构原则</div>
+            <div class="article-meta">
+              <span class="article-tag tag-design">设计</span>
+              <span class="article-tag tag-product">产品</span>
+              <span class="article-date">2024-06-10</span>
+            </div>
+          </div>
+          <div class="article-item">
+            <div class="article-title">Transformer Architecture Explained</div>
+            <div class="article-meta">
+              <span class="article-tag tag-ai">人工智能</span>
+              <span class="article-date">2024-06-08</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部 -->
+<div class="footer">
+  <div class="footer-left">
+    <div class="footer-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <span>github.com/hiraicn/knowledge-base</span>
+  </div>
+  <div class="footer-right">
+    <div class="footer-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 12l3 3 5-5"/></svg>
+      100% 本地存储
+    </div>
+    <div class="footer-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Manifest V3
+    </div>
+    <div class="footer-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      隐私优先
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
