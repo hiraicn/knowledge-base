@@ -1,15 +1,20 @@
 /**
- * taxonomy.js — 知识库分类词库（共享模块）
+ * taxonomy.js — 知识库默认分类词库（共享模块）
  *
- * UMD 模式：浏览器中作为全局变量 TAXONOMY，Node.js 中通过 require 导入。
- * 浏览器用法：<script src="lib/taxonomy.js"></script> → 全局 TAXONOMY 可用
- * Node.js 用法：const { TAXONOMY } = require('./extension/lib/taxonomy.js')
+ * UMD 模式：浏览器中作为全局变量 DEFAULT_TAXONOMY / TAXONOMY，Node.js 中通过 require 导入。
+ * 浏览器用法：<script src="lib/taxonomy.js"></script> → 全局 DEFAULT_TAXONOMY 可用
+ * Node.js 用法：const DEFAULT_TAXONOMY = require('./extension/lib/taxonomy.js')
+ *
+ * 用户可通过设置页面自定义分类，存储在 kb_settings 中。
+ * 本模块导出的为系统默认分类，当无自定义时回退使用。
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory();
   } else {
-    root.TAXONOMY = factory();
+    var tax = factory();
+    root.DEFAULT_TAXONOMY = tax;
+    root.TAXONOMY = tax; // 向后兼容
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';

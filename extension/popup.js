@@ -72,6 +72,9 @@ async function addToKnowledgeBase() {
       statusEl.className = "status success";
       var html = '✅ 添加成功!<div class="article-title">' + escapeHtml(article.title) + "</div>";
       html += '<div class="meta-line">分类: ' + escapeHtml(article.category) + "</div>";
+      if (article.summary) {
+        html += '<div class="meta-line" style="font-size:11px;color:#888;margin-top:4px;">' + escapeHtml(article.summary.slice(0, 80)) + '</div>';
+      }
       html += '<div class="tags">';
       article.tags.forEach(function (t) { html += '<span class="tag">' + escapeHtml(t) + "</span>"; });
       html += "</div>";
@@ -87,22 +90,30 @@ async function addToKnowledgeBase() {
   }
 }
 
-// ─── 重建知识库(重新打标签) ───
+// ─── 重建知识库(重新打标签,使用当前分类体系 + TF-IDF) ───
 async function rebuildKnowledgeBase() {
   rebuildBtn.disabled = true;
   rebuildBtn.textContent = "⏳ 重建中...";
   try {
     var storage = await chrome.storage.local.get("kb_articles");
     var articles = storage.kb_articles || [];
+
+    // 获取当前分类体系(支持自定义分类)
+    var taxonomy = await KBEngine.getTaxonomy();
+
     articles.forEach(function (a) {
       var domain = a.domain || KBEngine.getDomain(a.url);
-      var r = KBEngine.autoTag(a.title, a.content, domain);
+      // 使用 TF-IDF 评分 + 当前分类体系
+      var r = KBEngine.autoTagWithTaxonomy(a.title, a.content, domain, taxonomy);
       a.category = r.category;
       a.tags = r.tags;
+      // 重新生成摘要
+      a.summary = KBEngine.generateSummary(a.content, r.tags);
     });
+
     await chrome.storage.local.set({ kb_articles: articles });
     statusEl.className = "status success";
-    statusEl.textContent = "✅ 知识库已重建! 重新分类了 " + articles.length + " 篇文章。";
+    statusEl.textContent = "✅ 知识库已重建! 使用 TF-IDF 重新分类了 " + articles.length + " 篇文章。";
     loadStats();
   } catch (err) {
     statusEl.className = "status error";

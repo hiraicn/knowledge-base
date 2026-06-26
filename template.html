@@ -643,6 +643,52 @@ body {
   color: var(--text-muted);
   text-align: center;
 }
+
+/* ─── 摘要卡片 ─── */
+.article-summary {
+  margin: 16px 0;
+  padding: 14px 18px;
+  background: var(--bg-quote);
+  border-radius: 8px;
+  border-left: 3px solid var(--accent);
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.article-summary::before {
+  content: "📝 摘要";
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+/* ─── 引用关系 ─── */
+.references-section {
+  margin-top: 24px;
+  padding: 16px;
+  background: var(--bg-quote);
+  border-radius: 8px;
+}
+.references-section h4 { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+.references-section .ref-list { list-style: none; padding: 0; }
+.references-section .ref-list li { margin-bottom: 4px; }
+.references-section .ref-list a { color: var(--link); text-decoration: none; font-size: 13px; }
+.references-section .ref-list a:hover { text-decoration: underline; }
+.references-section .ref-group { margin-bottom: 12px; }
+.references-section .ref-group:last-child { margin-bottom: 0; }
+
+.search-result-item .sr-summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 </style>
 </head>
 <body>
@@ -846,6 +892,11 @@ function showArticle(articleId) {
     html += '</div>';
   }
 
+  // 摘要
+  if (article.summary) {
+    html += `<div class="article-summary">${escapeHtml(article.summary)}</div>`;
+  }
+
   // 正文
   html += `<div class="article-content">`;
   html += `<h1>${escapeHtml(article.title)}</h1>`;
@@ -865,6 +916,35 @@ function showArticle(articleId) {
     .filter(Boolean);
 
   html += '<div class="article-footer">';
+
+  // 引用关系
+  const hasRefs = (article.references && article.references.length > 0) ||
+                  (article.referencedBy && article.referencedBy.length > 0);
+  if (hasRefs) {
+    html += '<div class="references-section">';
+    html += '<h4>🔗 引用关系</h4>';
+    if (article.references && article.references.length > 0) {
+      html += '<div class="ref-group"><h4>本文引用了 (' + article.references.length + ')</h4><ul class="ref-list">';
+      article.references.forEach(function(refId) {
+        const refArticle = VAULT.articles.find(function(a) { return a.id === refId; });
+        if (refArticle) {
+          html += '<li><a href="#' + refArticle.id + '" onclick="showArticle(\'' + refArticle.id + '\');return false;">' + escapeHtml(refArticle.title) + '</a></li>';
+        }
+      });
+      html += '</ul></div>';
+    }
+    if (article.referencedBy && article.referencedBy.length > 0) {
+      html += '<div class="ref-group"><h4>被以下文章引用 (' + article.referencedBy.length + ')</h4><ul class="ref-list">';
+      article.referencedBy.forEach(function(refId) {
+        const refArticle = VAULT.articles.find(function(a) { return a.id === refId; });
+        if (refArticle) {
+          html += '<li><a href="#' + refArticle.id + '" onclick="showArticle(\'' + refArticle.id + '\');return false;">' + escapeHtml(refArticle.title) + '</a></li>';
+        }
+      });
+      html += '</ul></div>';
+    }
+    html += '</div>';
+  }
 
   if (related.length > 0) {
     html += '<div class="related-articles">';
@@ -953,7 +1033,8 @@ function handleSearch(query) {
   for (const r of results.slice(0, 20)) {
     const title = escapeHtml(r.title);
     const cat = escapeHtml(r.category || '');
-    html += `<div class="search-result-item" onclick="showArticle('${r.id}');document.getElementById('search-input').value='';handleSearch('')">${title}<span class="sr-category">${cat}</span></div>`;
+    const summaryHtml = r.summary ? `<span class="sr-summary">${escapeHtml(r.summary.slice(0, 60))}</span>` : '';
+    html += `<div class="search-result-item" onclick="showArticle('${r.id}');document.getElementById('search-input').value='';handleSearch('')">${title}<span class="sr-category">${cat}</span>${summaryHtml}</div>`;
   }
   if (results.length > 20) {
     html += `<div class="no-results">还有 ${results.length - 20} 条结果...</div>`;

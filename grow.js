@@ -21,7 +21,8 @@ const crypto = require('crypto');
 const cheerio = require('cheerio');
 const TurndownService = require('turndown');
 const { marked } = require('marked');
-const TAXONOMY = require('./extension/lib/taxonomy.js');
+const DEFAULT_TAXONOMY = require('./extension/lib/taxonomy.js');
+const SETTINGS_FILE = path.join(__dirname, 'kb-settings.json');
 
 // ─── 配置 ────────────────────────────────────────────────
 const VAULT_DIR = path.join(__dirname, 'vault');
@@ -61,7 +62,171 @@ turndown.addRule('preserveImages', {
   },
 });
 
-// TAXONOMY 从 taxonomy.js 加载(见文件顶部 require)
+// ─── 自定义分类管理 ──────────────────────────────────────
+
+function loadTaxonomy() {
+  if (fs.existsSync(SETTINGS_FILE)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+      if (settings.categories && Object.keys(settings.categories).length > 0) {
+        return settings.categories;
+      }
+    } catch (e) { /* ignore */ }
+  }
+  return DEFAULT_TAXONOMY;
+}
+
+// ─── TF-IDF 自动打标签 ──────────────────────────────────
+
+function computeIDF(taxonomy) {
+  const idf = {};
+  const totalCats = Object.keys(taxonomy).length;
+  if (totalCats === 0) return idf;
+
+  for (const [cat, keywords] of Object.entries(taxonomy)) {
+    for (const kw of keywords) {
+      const kwLower = kw.toLowerCase();
+      if (!idf[kwLower]) idf[kwLower] = { catCount: 0, cats: [] };
+      if (!idf[kwLower].cats.includes(cat)) {
+        idf[kwLower].catCount++;
+        idf[kwLower].cats.push(cat);
+      }
+    }
+  }
+
+  for (const kw of Object.keys(idf)) {
+    idf[kw] = Math.log(totalCats / idf[kw].catCount);
+  }
+  return idf;
+}
+
+function tokenize(text) {
+  return text.toLowerCase()
+    .split(/[\s,，。、；;：:!！?？()（）\[\]{}<>《》""''`~@#$%^&*+=|\\/]+/)
+    .filter(w => w.length >= 2);
+}
+
+function autoTag(title, content, domain) {
+  const taxonomy = loadTaxonomy();
+  const fullText = (title + ' ' + content).toLowerCase();
+  const titleText = title.toLowerCase();
+  const tokens = tokenize(fullText);
+  const totalWords = Math.max(tokens.length, 1);
+  const idf = computeIDF(taxonomy);
+
+  const scores = {};
+  for (const [cat, keywords] of Object.entries(taxonomy)) {
+    let score = 0;
+    for (const kw of keywords) {
+      const kwLower = kw.toLowerCase();
+      const kwIdf = idf[kwLower] || 0;
+      if (kwIdf === 0) continue;
+      const tf = countKeyword(fullText, kwLower) / totalWords;
+      const titleBoost = countKeyword(titleText, kwLower) > 0 ? 3 : 1;
+      score += tf * kwIdf * titleBoost;
+    }
+    if (score > 0) scores[cat] = score;
+  }
+
+  const sortedCategories = Object.entries(scores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([cat]) => cat);
+
+  if (sortedCategories.length === 0) sortedCategories.push('未分类');
+
+  const tags = new Set();
+  sortedCategories.forEach(c => tags.add(c));
+  if (domain) tags.add(domain);
+
+  const titleWords = title.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length >= 2);
+  titleWords.slice(0, 3).forEach(w => tags.add(w));
+
+  const topCategory = sortedCategories[0];
+  if (taxonomy[topCategory]) {
+    const kwScores = taxonomy[topCategory]
+      .map(kw => ({ kw, score: idf[kw.toLowerCase()] || 0 }))
+      .filter(item => item.score > 0 && countKeyword(fullText, item.kw.toLowerCase()) > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+    kwScores.forEach(item => tags.add(item.kw));
+  }
+
+  return { category: sortedCategories[0], tags: Array.from(tags).slice(0, 8) };
+}
+
+// ─── 纯提取式自动摘要 ──────────────────────────────────
+
+function generateSummary(content, tags) {
+  if (!content || content.length < 50) return '';
+
+  const sentences = content
+    .split(/(?<=[。！？.!?\n])\s*/)
+    .map(s => s.trim())
+    .filter(s => s.length >= 10);
+
+  if (sentences.length === 0) return '';
+
+  const keywords = (tags || []).filter(t => t.length >= 2 && !/\.|com|net|org|cn|io/.test(t));
+
+  const scored = sentences.map((sentence, index) => {
+    let score = 0;
+    if (index === 0) score += 3;
+    else if (index === 1) score += 2;
+    else if (index === 2) score += 1.5;
+    else if (index < 6) score += 0.5;
+
+    keywords.forEach(kw => {
+      if (sentence.toLowerCase().includes(kw.toLowerCase())) score += 1;
+    });
+
+    if (sentence.length < 15) score *= 0.5;
+    else if (sentence.length > 200) score *= 0.7;
+
+    return { sentence, score, index };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const topSentences = scored.slice(0, 3).sort((a, b) => a.index - b.index);
+  let summary = topSentences.map(s => s.sentence).join('');
+
+  if (summary.length > 150) summary = summary.slice(0, 147) + '...';
+  return summary;
+}
+
+// ─── 双向引用提取 ──────────────────────────────────────
+
+function extractReferences(content, articleUrl, existingArticles) {
+  const linkRegex = /\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
+  const htmlLinkRegex = /href=["'](https?:\/\/[^"']+)["']/gi;
+  const urls = new Set();
+  let match;
+
+  while ((match = linkRegex.exec(content)) !== null) urls.add(match[2]);
+  while ((match = htmlLinkRegex.exec(content)) !== null) urls.add(match[1]);
+
+  const references = [];
+  const urlToId = {};
+  existingArticles.forEach(a => { if (a.url) urlToId[a.url] = a.id; });
+
+  urls.forEach(url => {
+    if (urlToId[url] && url !== articleUrl) {
+      references.push(urlToId[url]);
+      return;
+    }
+    const normalizedUrl = url.replace(/\/$/, '').replace(/[#?].*$/, '');
+    existingArticles.forEach(a => {
+      if (!a.url) return;
+      const normalizedAUrl = a.url.replace(/\/$/, '').replace(/[#?].*$/, '');
+      if (normalizedUrl === normalizedAUrl && url !== articleUrl) {
+        if (!references.includes(a.id)) references.push(a.id);
+      }
+    });
+  });
+
+  return references;
+}
+
 // ─── 关键词计数(英文用词边界,中文用 indexOf) ───
 function countKeyword(text, kw) {
   if (/[\u4e00-\u9fff]/.test(kw)) {
@@ -143,7 +308,6 @@ function generateId() {
 }
 
 function slugify(title) {
-  // 取标题前30字符,去除特殊字符
   return title
     .replace(/[^\p{L}\p{N}\s-]/gu, '')
     .trim()
@@ -203,35 +367,25 @@ function parseWeChat(html, url) {
     || $('meta[property="og:description"]').attr('content')?.split(',')[0]?.trim()
     || '';
 
-  // 发布时间
   let publishTime = '';
   const timeText = $('#publish_time').text().trim()
     || $('em#publish_time').text().trim()
     || $('meta[property="article:published_time"]').attr('content');
   if (timeText) publishTime = timeText;
 
-  // 正文内容
   let contentHtml = '';
   const contentEl = $('#js_content');
   if (contentEl.length) {
     contentHtml = contentEl.html();
   } else {
-    // 备用:尝试 rich_media_content
     contentHtml = $('.rich_media_content').html() || '';
   }
 
-  // 描述
   const description = $('meta[name="description"]').attr('content')?.trim()
     || $('meta[property="og:description"]').attr('content')?.trim()
     || '';
 
-  return {
-    title: title || '未知标题',
-    author: author,
-    contentHtml: contentHtml,
-    publishTime: publishTime,
-    description: description,
-  };
+  return { title: title || '未知标题', author, contentHtml, publishTime, description };
 }
 
 // ─── 通用网页解析 ────────────────────────────────────────
@@ -239,59 +393,36 @@ function parseWeChat(html, url) {
 function parseWebPage(html, url) {
   const $ = cheerio.load(html);
 
-  // 标题:优先 og:title,其次 <title>
   const title = $('meta[property="og:title"]').attr('content')?.trim()
-    || $('title').text().trim()
-    || '';
+    || $('title').text().trim() || '';
 
-  // 作者
   const author = $('meta[name="author"]').attr('content')?.trim()
     || $('meta[property="article:author"]').attr('content')?.trim()
-    || $('.author').text().trim()
-    || $('[rel="author"]').text().trim()
-    || '';
+    || $('.author').text().trim() || '';
 
-  // 描述
   const description = $('meta[name="description"]').attr('content')?.trim()
-    || $('meta[property="og:description"]').attr('content')?.trim()
-    || '';
+    || $('meta[property="og:description"]').attr('content')?.trim() || '';
 
-  // 正文内容:按优先级尝试多种选择器
   const contentSelectors = [
-    'article',
-    'main',
-    '.post-content',
-    '.article-content',
-    '.entry-content',
-    '.article-body',
-    '.post-body',
-    '#article',
-    '#content',
-    '.content',
-    '.markdown-body',
-    '.rst-content',
-    '.documentation',
+    'article', 'main', '.post-content', '.article-content', '.entry-content',
+    '.article-body', '.post-body', '#article', '#content', '.content',
+    '.markdown-body', '.rst-content', '.documentation',
   ];
 
-  let contentEl = null;
   let contentHtml = '';
-
   for (const selector of contentSelectors) {
     const el = $(selector);
     if (el.length && el.text().trim().length > 200) {
-      contentEl = el.first();
-      contentHtml = el.html();
+      contentHtml = el.first().html();
       break;
     }
   }
 
-  // 如果上面没找到,用文本密度算法找最大文本块
   if (!contentHtml) {
     let maxText = 0;
     $('div, section').each((i, el) => {
       const $el = $(el);
       const text = $el.text().trim();
-      // 排除导航、页脚等
       if (text.length > maxText) {
         const tag = $el.attr('class') || '';
         const id = $el.attr('id') || '';
@@ -303,20 +434,12 @@ function parseWebPage(html, url) {
     });
   }
 
-  // 如果还是没找到,就用 body
   if (!contentHtml) {
-    // 清理 script, style, nav 等
     $('script, style, nav, footer, header, aside, iframe, noscript').remove();
     contentHtml = $('body').html() || '';
   }
 
-  return {
-    title: title || '未知标题',
-    author: author,
-    contentHtml: contentHtml,
-    publishTime: '',
-    description: description,
-  };
+  return { title: title || '未知标题', author, contentHtml, publishTime: '', description };
 }
 
 // ─── HTML → Markdown 转换 ────────────────────────────────
@@ -324,69 +447,8 @@ function parseWebPage(html, url) {
 function htmlToMarkdown(html) {
   if (!html || !html.trim()) return '';
   let md = turndown.turndown(html);
-  // 清理多余空行
   md = md.replace(/\n{3,}/g, '\n\n').trim();
   return md;
-}
-
-// ─── 自动打标签 ──────────────────────────────────────────
-
-function autoTag(title, content, domain) {
-  const text = (title + ' ' + content).toLowerCase();
-  const scores = {};
-
-  for (const [category, keywords] of Object.entries(TAXONOMY)) {
-    let score = 0;
-    for (const kw of keywords) {
-      score += countKeyword(text, kw);
-    }
-    if (score > 0) {
-      scores[category] = score;
-    }
-  }
-
-  // 排序取前2个分类
-  const sortedCategories = Object.entries(scores)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2)
-    .map(([cat]) => cat);
-
-  // 如果没有匹配到任何分类,用"未分类"
-  if (sortedCategories.length === 0) {
-    sortedCategories.push('未分类');
-  }
-
-  // 生成标签
-  const tags = new Set();
-
-  // 1. 分类作为标签
-  sortedCategories.forEach(c => tags.add(c));
-
-  // 2. 域名作为标签
-  if (domain) {
-    tags.add(domain);
-  }
-
-  // 3. 从标题提取关键词作为标签
-  const titleWords = title
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .split(/\s+/)
-    .filter(w => w.length >= 2);
-  titleWords.slice(0, 3).forEach(w => tags.add(w));
-
-  // 4. 找到的高频分类关键词也作为标签
-  const topCategory = sortedCategories[0];
-  if (TAXONOMY[topCategory]) {
-    const matchedKeywords = TAXONOMY[topCategory]
-      .filter(kw => countKeyword(text, kw) > 0)
-      .slice(0, 3);
-    matchedKeywords.forEach(kw => tags.add(kw));
-  }
-
-  return {
-    category: sortedCategories[0],
-    tags: Array.from(tags).slice(0, 8),
-  };
 }
 
 // ─── 保存文章 ────────────────────────────────────────────
@@ -412,6 +474,9 @@ function saveArticle(article) {
     `tags: [${article.tags.map(t => `"${t}"`).join(', ')}]`,
     `created: "${article.created.toISOString()}"`,
     article.publishTime ? `published: "${article.publishTime}"` : null,
+    article.summary ? `summary: "${article.summary.replace(/"/g, '\\"')}"` : null,
+    article.references && article.references.length ? `references: [${article.references.map(r => `"${r}"`).join(', ')}]` : null,
+    article.referencedBy && article.referencedBy.length ? `referencedBy: [${article.referencedBy.map(r => `"${r}"`).join(', ')}]` : null,
     '---',
     '',
   ].filter(Boolean).join('\n');
@@ -448,6 +513,9 @@ function loadVault() {
       tags: Array.isArray(meta.tags) ? meta.tags : [],
       created: meta.created || '',
       published: meta.published || '',
+      summary: meta.summary || '',
+      references: Array.isArray(meta.references) ? meta.references : [],
+      referencedBy: Array.isArray(meta.referencedBy) ? meta.referencedBy : [],
       content: content,
     };
 
@@ -541,6 +609,9 @@ function buildArticleData(article) {
     created: article.created,
     published: article.published || '',
     contentHtml: htmlContent,
+    summary: article.summary || '',
+    references: article.references || [],
+    referencedBy: article.referencedBy || [],
   };
 }
 
@@ -648,6 +719,15 @@ async function scrapeUrl(url) {
   console.log(`   分类: ${category}`);
   console.log(`   标签: ${tags.join(', ')}`);
 
+  // 生成摘要
+  const summary = generateSummary(markdown, tags);
+  if (summary) console.log(`   摘要: ${summary.slice(0, 60)}...`);
+
+  // 提取双向引用
+  const existingArticles = loadVault();
+  const references = extractReferences(markdown, url, existingArticles);
+  if (references.length > 0) console.log(`   引用: ${references.length} 篇知识库文章`);
+
   // 构建文章对象
   const article = {
     id: generateId(),
@@ -661,6 +741,9 @@ async function scrapeUrl(url) {
     created: new Date(),
     publishTime: parsed.publishTime || '',
     content: markdown,
+    summary: summary,
+    references: references,
+    referencedBy: [],
   };
 
   // 保存

@@ -37,6 +37,7 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
 .search-result-item { padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--text-secondary); }
 .search-result-item:hover { background: var(--bg-hover); color: var(--text); }
 .search-result-item .sr-cat { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+.search-result-item .sr-summary { font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #category-tree { padding: 8px 0 20px; }
 .tree-cat-header { padding: 5px 18px; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none; }
 .tree-cat-header:hover { background: var(--bg-hover); }
@@ -48,9 +49,10 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
 .tree-link { display: block; padding: 4px 18px 4px 32px; font-size: 13px; color: var(--text-secondary); text-decoration: none; border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .tree-link:hover { color: var(--text); background: var(--bg-hover); }
 .tree-link.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg-hover); font-weight: 500; }
-#sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; }
-#theme-toggle { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 14px; color: var(--text-secondary); }
-#theme-toggle:hover { background: var(--bg-hover); }
+#sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+#sidebar-footer .footer-btns { display: flex; gap: 4px; }
+.icon-btn { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 14px; color: var(--text-secondary); }
+.icon-btn:hover { background: var(--bg-hover); }
 
 #main { margin-left: var(--sidebar-width); min-height: 100vh; }
 #toolbar { padding: 8px 32px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; background: var(--bg-sidebar); flex-wrap: wrap; }
@@ -58,6 +60,8 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
 .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
 .tool-btn.sync-btn { border-color: #4caf50; color: #4caf50; }
 .tool-btn.sync-btn:hover { background: #e8f5e9; }
+.tool-btn.graph-btn { border-color: #9c27b0; color: #9c27b0; }
+.tool-btn.graph-btn:hover { background: #f3e5f5; }
 #article-container { max-width: var(--content-width); margin: 0 auto; padding: 40px 32px 80px; }
 
 .welcome { text-align: center; padding: 80px 20px; }
@@ -76,6 +80,21 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
 .article-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .tag { display: inline-block; padding: 2px 8px; background: var(--bg-tag); border-radius: 12px; font-size: 11px; color: var(--text-secondary); cursor: pointer; }
 .tag:hover { background: var(--accent); color: #fff; }
+
+/* 摘要卡片 */
+.article-summary { margin: 16px 0; padding: 14px 18px; background: var(--bg-quote); border-radius: 8px; border-left: 3px solid var(--accent); font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+.article-summary::before { content: "📝 摘要"; display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; }
+
+/* 引用关系 */
+.references-section { margin-top: 24px; padding: 16px; background: var(--bg-quote); border-radius: 8px; }
+.references-section h4 { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+.references-section .ref-list { list-style: none; padding: 0; }
+.references-section .ref-list li { margin-bottom: 4px; }
+.references-section .ref-list a { color: var(--link); text-decoration: none; font-size: 13px; }
+.references-section .ref-list a:hover { text-decoration: underline; }
+.references-section .ref-group { margin-bottom: 12px; }
+.references-section .ref-group:last-child { margin-bottom: 0; }
+
 .article-content { font-family: var(--font-body); font-size: 16px; line-height: 1.8; }
 .article-content h1 { font-family: var(--font-ui); font-size: 28px; font-weight: 700; margin: 0 0 16px; line-height: 1.3; }
 .article-content h2 { font-family: var(--font-ui); font-size: 22px; font-weight: 600; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
@@ -126,13 +145,19 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
 .modal-box .modal-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-.form-group input { width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; background: var(--bg); color: var(--text); font-family: var(--font-mono); outline: none; }
-.form-group input:focus { border-color: var(--accent); }
+.form-group input, .form-group textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; background: var(--bg); color: var(--text); font-family: var(--font-mono); outline: none; }
+.form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
 .form-group input:read-only { background: var(--bg-code); color: var(--text-muted); }
 .form-group .help-link { font-size: 11px; color: var(--link); margin-top: 4px; display: inline-block; }
 .form-group .muted { font-size: 12px; color: var(--text-muted); }
 .modal-actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
 .modal-actions button { padding: 10px 16px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: var(--font-ui); transition: all 0.15s; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-danger { background: #f44336; color: white; }
+.btn-danger:hover { background: #d32f2f; }
+.btn-secondary { background: var(--bg-hover); color: var(--text-secondary); }
+.btn-secondary:hover { background: var(--border); }
 .btn-sync-push { background: #4caf50; color: white; }
 .btn-sync-push:hover { background: #43a047; }
 .btn-sync-pull { background: #2196f3; color: white; }
@@ -148,6 +173,25 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
 #toast.show { transform: translateX(-50%) translateY(0); }
 #toast.success { background: #2e7d32; }
 #toast.error { background: #c62828; }
+
+/* ─── 设置面板 ─── */
+.settings-modal .modal-box { max-width: 560px; }
+.cat-list { max-height: 400px; overflow-y: auto; }
+.cat-item { padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+.cat-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cat-item-name { font-weight: 600; font-size: 14px; flex: 1; cursor: pointer; }
+.cat-item-name:hover { color: var(--accent); }
+.cat-item-actions { display: flex; gap: 4px; }
+.cat-item-actions button { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 4px; opacity: 0.6; }
+.cat-item-actions button:hover { opacity: 1; }
+.cat-keywords { display: flex; flex-wrap: wrap; gap: 4px; }
+.cat-kw { display: inline-block; padding: 1px 6px; background: var(--bg-tag); border-radius: 10px; font-size: 11px; color: var(--text-secondary); }
+.cat-kw-remove { cursor: pointer; margin-left: 2px; opacity: 0.5; }
+.cat-kw-remove:hover { opacity: 1; color: #f44336; }
+.cat-add-keyword { display: inline-flex; align-items: center; gap: 2px; }
+.cat-add-keyword input { width: 80px; padding: 1px 4px; border: 1px dashed var(--border-strong); border-radius: 10px; font-size: 11px; background: transparent; color: var(--text); outline: none; }
+.add-cat-form { padding: 12px; border: 1px dashed var(--border-strong); border-radius: 8px; margin-top: 8px; }
+.add-cat-form input { margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -162,7 +206,10 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
   <div id="category-tree"></div>
   <div id="sidebar-footer">
     <span id="article-count">0 篇</span>
-    <button id="theme-toggle">🌙</button>
+    <div class="footer-btns">
+      <button class="icon-btn" id="btn-settings" title="分类设置">⚙️</button>
+      <button class="icon-btn" id="theme-toggle" title="切换主题">🌙</button>
+    </div>
   </div>
 </div>
 <div id="main">
@@ -171,12 +218,14 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
     <button class="tool-btn" id="btn-import-folder">📂 从文件夹导入</button>
     <button class="tool-btn" id="btn-export">📦 导出全部</button>
     <button class="tool-btn sync-btn" id="btn-sync">☁️ 云端同步</button>
+    <button class="tool-btn graph-btn" id="btn-graph">🕸️ 知识图谱</button>
     <input type="file" id="importInput" accept=".md" multiple>
     <input type="file" id="folderInput" webkitdirectory multiple>
   </div>
   <div id="article-container"></div>
 </div>
 
+<!-- 同步模态框 -->
 <div id="sync-modal" style="display:none;">
   <div class="modal-overlay" id="sync-overlay">
     <div class="modal-box">
@@ -201,6 +250,24 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); l
         <button class="btn-sync-close" id="syncCloseBtn">关闭</button>
       </div>
       <div id="sync-status"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 设置模态框 -->
+<div id="settings-modal" class="settings-modal" style="display:none;">
+  <div class="modal-overlay" id="settings-overlay">
+    <div class="modal-box">
+      <h2>⚙️ 分类管理</h2>
+      <p class="modal-desc">自定义知识库的分类体系和关键词。修改后新收藏的文章将使用新分类,已有文章可通过「重建知识库」重新分类。</p>
+      <div class="cat-list" id="cat-list"></div>
+      <div id="add-cat-area">
+        <button class="btn-primary" id="btn-show-add-cat" style="width:100%;margin-top:8px;">+ 新增分类</button>
+      </div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn-secondary" id="btn-reset-cats">恢复默认分类</button>
+        <button class="btn-primary" id="btn-close-settings">关闭</button>
+      </div>
     </div>
   </div>
 </div>

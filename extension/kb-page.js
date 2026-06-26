@@ -1,6 +1,7 @@
 // ─── 全局状态 ───
 var VAULT = { articles: [], categories: {}, tags: {}, stats: { total: 0, categories: 0, tags: 0 } };
 var currentArticleId = null;
+var currentTaxonomy = null; // 缓存当前分类体系
 
 // ─── 搜索倒排索引 ───
 var searchIndex = { title: {}, content: {} };
@@ -88,6 +89,11 @@ function saveToStorage(callback) {
 
 // ─── 初始化 ───
 function init() {
+  // 加载分类体系缓存
+  KBEngine.getTaxonomy().then(function (tax) {
+    currentTaxonomy = tax;
+  });
+
   loadFromStorage(function () {
     var savedTheme = localStorage.getItem("kb-theme") || "light";
     if (savedTheme === "dark") {
@@ -122,6 +128,12 @@ function init() {
         }
       });
     }
+    // 分类设置变更时刷新缓存
+    if (changes.kb_settings) {
+      KBEngine.getTaxonomy().then(function (tax) {
+        currentTaxonomy = tax;
+      });
+    }
   });
 
   window.addEventListener("hashchange", function () {
@@ -133,7 +145,7 @@ function init() {
 // ─── 渲染侧边栏 ───
 function renderSidebar() {
   var tree = document.getElementById("category-tree");
-  document.getElementById("article-count").textContent = VAULT.stats.total + " 篇文章";
+  document.getElementById("article-count").textContent = VAULT.stats.total + " 篇";
 
   if (VAULT.articles.length === 0) {
     tree.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">知识库为空<br>在任意网页点击插件"加入知识库"<br>或将 .md 文件拖入此页面</div>';
@@ -208,10 +220,47 @@ function showArticle(articleId) {
     html += '</div>';
   }
 
+  // 摘要
+  if (article.summary) {
+    html += '<div class="article-summary">' + escapeHtml(article.summary) + '</div>';
+  }
+
   // 正文
   html += '<div class="article-content"><h1>' + escapeHtml(article.title) + '</h1>';
   html += contentHtml;
   html += '</div>';
+
+  // 引用关系
+  var hasRefs = (article.references && article.references.length > 0) ||
+                (article.referencedBy && article.referencedBy.length > 0);
+  if (hasRefs) {
+    html += '<div class="references-section">';
+    html += '<h4>🔗 引用关系</h4>';
+
+    if (article.references && article.references.length > 0) {
+      html += '<div class="ref-group"><h4>本文引用了 (' + article.references.length + ')</h4><ul class="ref-list">';
+      article.references.forEach(function (refId) {
+        var refArticle = VAULT.articles.find(function (a) { return a.id === refId; });
+        if (refArticle) {
+          html += '<li><a href="#' + refArticle.id + '">' + escapeHtml(refArticle.title) + '</a></li>';
+        }
+      });
+      html += '</ul></div>';
+    }
+
+    if (article.referencedBy && article.referencedBy.length > 0) {
+      html += '<div class="ref-group"><h4>被以下文章引用 (' + article.referencedBy.length + ')</h4><ul class="ref-list">';
+      article.referencedBy.forEach(function (refId) {
+        var refArticle = VAULT.articles.find(function (a) { return a.id === refId; });
+        if (refArticle) {
+          html += '<li><a href="#' + refArticle.id + '">' + escapeHtml(refArticle.title) + '</a></li>';
+        }
+      });
+      html += '</ul></div>';
+    }
+
+    html += '</div>';
+  }
 
   // 同分类文章
   var related = (VAULT.categories[article.category] || []).filter(function (id) { return id !== articleId; }).slice(0, 5)
@@ -260,12 +309,22 @@ function showWelcome() {
     '</div>' +
     '<div class="guide"><h3>📦 导入已有文章</h3><p>点击工具栏「📂 从文件夹导入」选择 vault 文件夹,或直接将 .md 文件拖入此页面。支持批量导入,自动解析 YAML frontmatter 并重新打标签。</p></div>' +
     '<div class="guide"><h3>☁️ 跨设备同步</h3><p>点击工具栏「☁️ 云端同步」,配置 GitHub Token 后即可在不同浏览器间同步知识库。</p></div>' +
+    '<div class="guide"><h3>🕸️ 知识图谱</h3><p>点击工具栏「🕸️ 知识图谱」查看文章之间的关联关系可视化。</p></div>' +
     '</div>';
 }
 
 // ─── 删除文章 ───
 function deleteArticle(id) {
   if (!confirm("确定删除这篇文章?")) return;
+  // 清理其他文章的引用关系
+  VAULT.articles.forEach(function (a) {
+    if (a.references) {
+      a.references = a.references.filter(function (r) { return r !== id; });
+    }
+    if (a.referencedBy) {
+      a.referencedBy = a.referencedBy.filter(function (r) { return r !== id; });
+    }
+  });
   VAULT.articles = VAULT.articles.filter(function (a) { return a.id !== id; });
   saveToStorage(function () {
     loadFromStorage(function () {
@@ -294,7 +353,12 @@ function handleSearch(query) {
     }
     var html = "";
     results.slice(0, 20).forEach(function (r) {
-      html += '<div class="search-result-item" data-action="search-result" data-id="' + r.id + '">' + escapeHtml(r.title) + '<span class="sr-cat">' + escapeHtml(r.category || "") + '</span></div>';
+      html += '<div class="search-result-item" data-action="search-result" data-id="' + r.id + '">';
+      html += escapeHtml(r.title) + '<span class="sr-cat">' + escapeHtml(r.category || "") + '</span>';
+      if (r.summary) {
+        html += '<span class="sr-summary">' + escapeHtml(r.summary.slice(0, 60)) + '</span>';
+      }
+      html += '</div>';
     });
     if (results.length > 20) html += '<div class="no-results">还有 ' + (results.length - 20) + ' 条结果,输入更多关键词精确搜索</div>';
     resultsEl.innerHTML = html;
@@ -320,6 +384,133 @@ function toggleTheme() {
   }
 }
 
+// ─── 分类设置面板 ───
+function openSettings() {
+  document.getElementById("settings-modal").style.display = "";
+  KBEngine.getTaxonomy().then(function (tax) {
+    currentTaxonomy = tax;
+    renderCatList(tax);
+  });
+}
+
+function closeSettings() {
+  document.getElementById("settings-modal").style.display = "none";
+}
+
+function renderCatList(taxonomy) {
+  var listEl = document.getElementById("cat-list");
+  var html = "";
+  var cats = Object.keys(taxonomy);
+
+  cats.forEach(function (cat) {
+    var keywords = taxonomy[cat] || [];
+    html += '<div class="cat-item" data-cat="' + escapeHtml(cat) + '">';
+    html += '<div class="cat-item-header">';
+    html += '<span class="cat-item-name" data-action="edit-cat-name" data-cat="' + escapeHtml(cat) + '">' + escapeHtml(cat) + '</span>';
+    html += '<span class="cat-item-actions">';
+    html += '<button data-action="delete-cat" data-cat="' + escapeHtml(cat) + '" title="删除分类">🗑️</button>';
+    html += '</span>';
+    html += '</div>';
+    html += '<div class="cat-keywords">';
+    keywords.forEach(function (kw) {
+      html += '<span class="cat-kw">' + escapeHtml(kw) + '<span class="cat-kw-remove" data-action="remove-kw" data-cat="' + escapeHtml(cat) + '" data-kw="' + escapeHtml(kw) + '">×</span></span>';
+    });
+    html += '<span class="cat-add-keyword"><input type="text" placeholder="+关键词" data-action="add-kw-input" data-cat="' + escapeHtml(cat) + '"></span>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  listEl.innerHTML = html;
+}
+
+async function addCategory(name, keywordsStr) {
+  if (!name.trim()) return;
+  var tax = await KBEngine.getTaxonomy();
+  if (tax[name.trim()]) {
+    showToast("分类「" + name + "」已存在", "error");
+    return;
+  }
+  var keywords = keywordsStr.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  tax[name.trim()] = keywords;
+  await KBEngine.saveTaxonomy(tax);
+  currentTaxonomy = tax;
+  renderCatList(tax);
+  showToast("已添加分类「" + name + "」", "success");
+}
+
+async function deleteCategory(cat) {
+  if (!confirm("确定删除分类「" + cat + "」?")) return;
+  var tax = await KBEngine.getTaxonomy();
+  delete tax[cat];
+  await KBEngine.saveTaxonomy(tax);
+  currentTaxonomy = tax;
+  renderCatList(tax);
+  showToast("已删除分类「" + cat + "」", "success");
+}
+
+async function removeKeyword(cat, kw) {
+  var tax = await KBEngine.getTaxonomy();
+  if (!tax[cat]) return;
+  tax[cat] = tax[cat].filter(function (k) { return k !== kw; });
+  await KBEngine.saveTaxonomy(tax);
+  currentTaxonomy = tax;
+  renderCatList(tax);
+}
+
+async function addKeyword(cat, kw) {
+  if (!kw.trim()) return;
+  var tax = await KBEngine.getTaxonomy();
+  if (!tax[cat]) return;
+  if (tax[cat].indexOf(kw.trim()) === -1) {
+    tax[cat].push(kw.trim());
+    await KBEngine.saveTaxonomy(tax);
+    currentTaxonomy = tax;
+    renderCatList(tax);
+  }
+}
+
+async function resetCategories() {
+  if (!confirm("确定恢复默认分类?所有自定义分类将被清除。")) return;
+  await KBEngine.resetTaxonomy();
+  currentTaxonomy = KBEngine.DEFAULT_TAXONOMY;
+  renderCatList(currentTaxonomy);
+  showToast("已恢复默认分类", "success");
+}
+
+// ─── 重建知识库(使用新分类体系重新打标签) ───
+async function rebuildKnowledgeBase() {
+  if (!confirm("将使用当前分类体系重新分类所有 " + VAULT.articles.length + " 篇文章,确定?")) return;
+  var tax = await KBEngine.getTaxonomy();
+  var count = 0;
+  VAULT.articles.forEach(function (a) {
+    var domain = a.domain || KBEngine.getDomain(a.url);
+    var r = KBEngine.autoTagWithTaxonomy(a.title, a.content, domain, tax);
+    if (a.category !== r.category || JSON.stringify(a.tags) !== JSON.stringify(r.tags)) {
+      a.category = r.category;
+      a.tags = r.tags;
+      a.summary = KBEngine.generateSummary(a.content, r.tags);
+      count++;
+    }
+  });
+  saveToStorage(function () {
+    loadFromStorage(function () {
+      renderSidebar();
+      if (VAULT.articles.length > 0) showArticle(VAULT.articles[0].id);
+      else showWelcome();
+      showToast("重建完成! 重新分类了 " + count + " 篇文章", "success");
+    });
+  });
+}
+
+// ─── 打开知识图谱 ───
+function openGraph() {
+  if (typeof chrome !== 'undefined' && chrome.tabs) {
+    chrome.tabs.create({ url: "graph.html" });
+  } else {
+    window.open("graph.html", "_blank");
+  }
+}
+
 // ─── Markdown 解析(使用增强版 frontmatter 解析器) ───
 function parseMdContent(raw, filename) {
   var article = {
@@ -332,6 +523,9 @@ function parseMdContent(raw, filename) {
     category: "",
     tags: [],
     content: "",
+    summary: "",
+    references: [],
+    referencedBy: [],
     created: new Date().toISOString(),
     published: "",
   };
@@ -350,11 +544,20 @@ function parseMdContent(raw, filename) {
   if (meta.created) article.created = meta.created;
   if (meta.published) article.published = meta.published;
   if (meta.id) article.id = meta.id;
+  if (meta.summary) article.summary = meta.summary;
+  if (meta.references && Array.isArray(meta.references)) article.references = meta.references;
+  if (meta.referencedBy && Array.isArray(meta.referencedBy)) article.referencedBy = meta.referencedBy;
 
-  if (!article.category) {
-    var r = KBEngine.autoTag(article.title, article.content, article.domain || "");
+  // 使用当前分类体系重新分类
+  if (!article.category && currentTaxonomy) {
+    var r = KBEngine.autoTagWithTaxonomy(article.title, article.content, article.domain || "", currentTaxonomy);
     article.category = r.category;
     if (article.tags.length === 0) article.tags = r.tags;
+  }
+
+  // 生成摘要
+  if (!article.summary) {
+    article.summary = KBEngine.generateSummary(article.content, article.tags);
   }
 
   if (article.url && !article.domain) {
@@ -447,6 +650,9 @@ function exportAll() {
     md += 'category: "' + (a.category || "") + '"\n';
     md += 'tags: [' + (a.tags || []).map(function (t) { return '"' + t + '"'; }).join(", ") + "]\n";
     md += 'created: "' + (a.created || "") + '"\n';
+    if (a.summary) md += 'summary: "' + a.summary.replace(/"/g, '\\"') + '"\n';
+    if (a.references && a.references.length) md += 'references: [' + a.references.map(function (r) { return '"' + r + '"'; }).join(", ") + "]\n";
+    if (a.referencedBy && a.referencedBy.length) md += 'referencedBy: [' + a.referencedBy.map(function (r) { return '"' + r + '"'; }).join(", ") + "]\n";
     md += "---\n\n" + (a.content || "");
 
     var blob = new Blob([md], { type: "text/markdown" });
@@ -608,6 +814,8 @@ document.getElementById("search-input").addEventListener("input", function () {
 
 document.getElementById("theme-toggle").addEventListener("click", toggleTheme);
 
+document.getElementById("btn-settings").addEventListener("click", openSettings);
+
 document.getElementById("btn-import-md").addEventListener("click", function () {
   document.getElementById("importInput").click();
 });
@@ -619,6 +827,8 @@ document.getElementById("btn-import-folder").addEventListener("click", function 
 document.getElementById("btn-export").addEventListener("click", exportAll);
 
 document.getElementById("btn-sync").addEventListener("click", openSyncModal);
+
+document.getElementById("btn-graph").addEventListener("click", openGraph);
 
 document.getElementById("importInput").addEventListener("change", function () {
   importFiles(this.files);
@@ -639,39 +849,132 @@ document.getElementById("syncPushBtn").addEventListener("click", syncToGist);
 document.getElementById("syncPullBtn").addEventListener("click", pullFromGist);
 document.getElementById("syncCloseBtn").addEventListener("click", closeSyncModal);
 
+// ── 设置弹窗 ──
+document.getElementById("settings-overlay").addEventListener("click", function (e) {
+  if (e.target === this) closeSettings();
+});
+
+document.getElementById("btn-close-settings").addEventListener("click", closeSettings);
+document.getElementById("btn-reset-cats").addEventListener("click", resetCategories);
+
+document.getElementById("btn-show-add-cat").addEventListener("click", function () {
+  var area = document.getElementById("add-cat-area");
+  if (area.querySelector(".add-cat-form")) return; // 已显示
+  var form = document.createElement("div");
+  form.className = "add-cat-form";
+  form.innerHTML = '<input type="text" id="new-cat-name" placeholder="分类名称" style="width:100%;">' +
+    '<input type="text" id="new-cat-keywords" placeholder="关键词(逗号分隔)" style="width:100%;">' +
+    '<div style="display:flex;gap:8px;margin-top:4px;">' +
+    '<button class="btn-primary" id="confirm-add-cat" style="flex:1;padding:6px;">添加</button>' +
+    '<button class="btn-secondary" id="cancel-add-cat" style="flex:1;padding:6px;">取消</button>' +
+    '</div>';
+  area.innerHTML = "";
+  area.appendChild(form);
+
+  document.getElementById("confirm-add-cat").addEventListener("click", function () {
+    var name = document.getElementById("new-cat-name").value.trim();
+    var keywords = document.getElementById("new-cat-keywords").value;
+    addCategory(name, keywords);
+  });
+  document.getElementById("cancel-add-cat").addEventListener("click", function () {
+    area.innerHTML = '<button class="btn-primary" id="btn-show-add-cat" style="width:100%;margin-top:8px;">+ 新增分类</button>';
+    document.getElementById("btn-show-add-cat").addEventListener("click", arguments.callee);
+    // 重新绑定(简化:直接 reload 设置面板)
+    location.reload();
+  });
+});
+
+// ── 设置面板事件委托 ──
+document.getElementById("cat-list").addEventListener("click", function (e) {
+  var target = e.target;
+
+  // 删除分类
+  var delBtn = target.closest('[data-action="delete-cat"]');
+  if (delBtn) {
+    deleteCategory(delBtn.getAttribute("data-cat"));
+    return;
+  }
+
+  // 删除关键词
+  var kwRemove = target.closest('[data-action="remove-kw"]');
+  if (kwRemove) {
+    removeKeyword(kwRemove.getAttribute("data-cat"), kwRemove.getAttribute("data-kw"));
+    return;
+  }
+
+  // 编辑分类名
+  var nameEl = target.closest('[data-action="edit-cat-name"]');
+  if (nameEl) {
+    var oldName = nameEl.getAttribute("data-cat");
+    var input = document.createElement("input");
+    input.type = "text";
+    input.value = oldName;
+    input.style.cssText = "width:120px;padding:2px 6px;font-size:14px;border:1px solid var(--accent);border-radius:4px;background:var(--bg);color:var(--text);";
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    var finish = async function () {
+      var newName = input.value.trim();
+      if (newName && newName !== oldName) {
+        var tax = await KBEngine.getTaxonomy();
+        if (tax[oldName]) {
+          tax[newName] = tax[oldName];
+          delete tax[oldName];
+          await KBEngine.saveTaxonomy(tax);
+          currentTaxonomy = tax;
+        }
+      }
+      renderCatList(currentTaxonomy || await KBEngine.getTaxonomy());
+    };
+    input.addEventListener("blur", finish);
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); input.blur(); }
+      if (ev.key === "Escape") { input.value = oldName; input.blur(); }
+    });
+    return;
+  }
+});
+
+// 关键词输入框(回车添加)
+document.getElementById("cat-list").addEventListener("keydown", function (e) {
+  if (e.target.matches('[data-action="add-kw-input"]') && e.key === "Enter") {
+    e.preventDefault();
+    var cat = e.target.getAttribute("data-cat");
+    var kw = e.target.value.trim();
+    if (kw) {
+      addKeyword(cat, kw);
+    }
+  }
+});
+
 // ── 事件委托:侧边栏分类树 ──
 document.getElementById("category-tree").addEventListener("click", function (e) {
-  // 点击分类标题 → 折叠/展开
   var header = e.target.closest(".tree-cat-header");
   if (header) {
     toggleCategory(header);
     return;
   }
-  // 点击文章链接 → 由 href="#id" 触发 hashchange,无需手动处理
 });
 
 // ── 事件委托:文章区域 ──
 document.getElementById("article-container").addEventListener("click", function (e) {
-  // 删除按钮
   var delEl = e.target.closest('[data-action="delete"]');
   if (delEl) {
     e.preventDefault();
     deleteArticle(delEl.getAttribute("data-id"));
     return;
   }
-  // 标签点击 → 过滤
   var tagEl = e.target.closest('[data-action="filter-tag"]');
   if (tagEl) {
     filterByTag(tagEl.getAttribute("data-tag"));
     return;
   }
-  // 上/下一篇导航
   var navEl = e.target.closest('[data-action="nav"]');
   if (navEl) {
     showArticle(navEl.getAttribute("data-id"));
     return;
   }
-  // 相关文章链接 → 由 href="#id" 触发 hashchange,无需手动处理
 });
 
 // ── 事件委托:搜索结果 ──
@@ -694,8 +997,10 @@ document.addEventListener("keydown", function (e) {
   if (e.key === "Escape") {
     var input = document.getElementById("search-input");
     if (document.activeElement === input) { input.value = ""; handleSearch(""); input.blur(); }
-    var modal = document.getElementById("sync-modal");
-    if (modal.style.display !== "none") { closeSyncModal(); }
+    var syncModal = document.getElementById("sync-modal");
+    if (syncModal.style.display !== "none") { closeSyncModal(); }
+    var settingsModal = document.getElementById("settings-modal");
+    if (settingsModal.style.display !== "none") { closeSettings(); }
   }
   if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
     if (e.key === "ArrowLeft" || e.key === "j") {
